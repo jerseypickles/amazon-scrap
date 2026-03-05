@@ -5,18 +5,25 @@ from datetime import datetime, timezone
 
 
 def new_watchlist_item_doc(id: int, **fields) -> dict:
+    now = datetime.now(timezone.utc)
+    initial_score = fields.get("last_score")
+    score_history: list[dict] = []
+    if initial_score is not None:
+        score_history.append({"score": initial_score, "date": now.isoformat()})
     return {
         "id": id,
         "keyword": fields.get("keyword", ""),
         "last_analysis_id": fields.get("last_analysis_id"),
-        "last_score": fields.get("last_score"),
+        "last_score": initial_score,
         "previous_score": fields.get("previous_score"),
         "score_trend": fields.get("score_trend"),
+        "score_history": score_history,
         "check_interval_hours": fields.get("check_interval_hours", 24),
         "is_active": fields.get("is_active", True),
+        "is_paused": False,
         "notes": fields.get("notes"),
         "last_checked_at": fields.get("last_checked_at"),
-        "created_at": datetime.now(timezone.utc),
+        "created_at": now,
     }
 
 

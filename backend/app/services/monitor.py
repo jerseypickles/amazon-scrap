@@ -10,11 +10,15 @@ from app.services.ai_advisor import ai_advisor
 
 logger = logging.getLogger(__name__)
 
+MAX_SCORE_HISTORY = 30  # Keep last 30 data-points per item
+
 
 class NicheMonitor:
     async def check_watchlist(self):
-        """Check all active watchlist items that are due for re-analysis."""
-        items = await _database.db.watchlist_items.find({"is_active": True}).to_list(length=200)
+        """Check all active, non-paused watchlist items that are due for re-analysis."""
+        items = await _database.db.watchlist_items.find(
+            {"is_active": True, "is_paused": {"$ne": True}},
+        ).to_list(length=200)
 
         for item in items:
             # Check if enough time has passed since last check
@@ -31,6 +35,67 @@ class NicheMonitor:
                 await self._reanalyze_item(item)
             except Exception as e:
                 logger.error(f"Failed to re-analyze {item['keyword']}: {e}")
+
+    async def force_reanalyze(self, item_id: int) -> dict | None:
+        """Force an immediate re-analysis of a watchlist item."""
+        item = await _database.db.watchlist_items.find_one({"id": item_id, "is_active": True})
+        if not item:
+            return None
+        await self._reanalyze_item(item)
+        return await _database.db.watchlist_items.find_one({"id": item_id})
+
+    async def toggle_pause(self, item_id: int) -> dict | None:
+        """Toggle pause state for a watchlist item."""
+        item = await _database.db.watchlist_items.find_one({"id": item_id, "is_active": True})
+        if not item:
+            return None
+        new_state = not item.get("is_paused", False)
+        await _database.db.watchlist_items.update_one(
+            {"_id": item["_id"]},
+            {"$set": {"is_paused": new_state}},
+        )
+        return await _database.db.watchlist_items.find_one({"id": item_id})
+
+    async def get_watchlist_stats(self) -> dict:
+        """Compute aggregate stats across all active watchlist items."""
+        items = await _database.db.watchlist_items.find(
+            {"is_active": True},
+        ).to_list(length=200)
+
+        total = len(items)
+        scores = [i["last_score"] for i in items if i.get("last_score") is not None]
+        avg_score = round(sum(scores) / len(scores), 1) if scores else None
+
+        up = sum(1 for i in items if i.get("score_trend") == "up")
+        down = sum(1 for i in items if i.get("score_trend") == "down")
+        stable = sum(1 for i in items if i.get("score_trend") == "stable")
+        new = sum(1 for i in items if i.get("score_trend") in (None, "new"))
+        paused = sum(1 for i in items if i.get("is_paused"))
+
+        # Find next scheduled check
+        next_check = None
+        for i in items:
+            if i.get("is_paused"):
+                continue
+            if i.get("last_checked_at"):
+                checked = i["last_checked_at"]
+                if checked.tzinfo is None:
+                    checked = checked.replace(tzinfo=timezone.utc)
+                interval_s = i.get("check_interval_hours", 24) * 3600
+                due = checked.timestamp() + interval_s
+                if next_check is None or due < next_check:
+                    next_check = due
+
+        return {
+            "total": total,
+            "avg_score": avg_score,
+            "trending_up": up,
+            "trending_down": down,
+            "stable": stable,
+            "new_unchecked": new,
+            "paused": paused,
+            "next_check_at": datetime.fromtimestamp(next_check, tz=timezone.utc).isoformat() if next_check else None,
+        }
 
     async def _reanalyze_item(self, item: dict):
         """Re-analyze a watchlist item and create notifications for changes."""
@@ -86,17 +151,31 @@ class NicheMonitor:
                 trend = "new"
                 run_ai = True
 
-            # Update watchlist item
+            # Build score_history entry
             now = datetime.now(timezone.utc)
-            await _database.db.watchlist_items.update_one(
-                {"_id": item["_id"]},
-                {"$set": {
+            history_entry = {"score": new_score, "date": now.isoformat()} if new_score is not None else None
+
+            # Append to history (keep last N entries)
+            update_ops: dict = {
+                "$set": {
                     "previous_score": old_score,
                     "last_score": new_score,
                     "score_trend": trend,
                     "last_analysis_id": analysis_resp.id,
                     "last_checked_at": now,
-                }},
+                },
+            }
+            if history_entry:
+                update_ops["$push"] = {
+                    "score_history": {
+                        "$each": [history_entry],
+                        "$slice": -MAX_SCORE_HISTORY,
+                    },
+                }
+
+            await _database.db.watchlist_items.update_one(
+                {"_id": item["_id"]},
+                update_ops,
             )
 
             # Run AI re-analysis when there's a significant change or first check
@@ -145,6 +224,7 @@ class NicheMonitor:
         if existing:
             update = {
                 "is_active": True,
+                "is_paused": False,
                 "check_interval_hours": interval_hours,
             }
             if notes:

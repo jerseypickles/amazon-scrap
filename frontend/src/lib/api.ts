@@ -8,6 +8,7 @@ import type {
   AIAnalysisResponse,
   AICompareResponse,
   WatchlistItem,
+  WatchlistStats,
   AppNotification,
   SmartNichesResponse,
 } from "@/types";
@@ -165,6 +166,18 @@ export async function addToWatchlist(data: {
 
 export async function removeFromWatchlist(itemId: number): Promise<void> {
   return fetchAPI(`/watchlist/${itemId}`, { method: "DELETE" });
+}
+
+export async function getWatchlistStats(): Promise<WatchlistStats> {
+  return fetchAPI("/watchlist/stats");
+}
+
+export async function forceReanalyze(itemId: number): Promise<WatchlistItem> {
+  return fetchAPI(`/watchlist/${itemId}/reanalyze`, { method: "POST" });
+}
+
+export async function togglePauseWatchlist(itemId: number): Promise<WatchlistItem> {
+  return fetchAPI(`/watchlist/${itemId}/pause`, { method: "PUT" });
 }
 
 // Notifications

@@ -53,6 +53,27 @@ async def check_watchlist(keyword: str):
     return {"watched": item is not None, "item_id": item["id"] if item else None}
 
 
+@router.get("/stats")
+async def get_watchlist_stats():
+    return await monitor.get_watchlist_stats()
+
+
+@router.post("/{item_id}/reanalyze")
+async def force_reanalyze(item_id: int):
+    item = await monitor.force_reanalyze(item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Watchlist item not found")
+    return _doc_to_watchlist_response(item)
+
+
+@router.put("/{item_id}/pause")
+async def toggle_pause(item_id: int):
+    item = await monitor.toggle_pause(item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Watchlist item not found")
+    return _doc_to_watchlist_response(item)
+
+
 @router.delete("/{item_id}")
 async def remove_from_watchlist(item_id: int):
     removed = await monitor.remove_from_watchlist(item_id)

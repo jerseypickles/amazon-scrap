@@ -283,6 +283,11 @@ export interface AICompareResponse {
 }
 
 // Watchlist types
+export interface ScoreHistoryPoint {
+  score: number;
+  date: string;
+}
+
 export interface WatchlistItem {
   id: number;
   keyword: string;
@@ -290,11 +295,24 @@ export interface WatchlistItem {
   last_score: number | null;
   previous_score: number | null;
   score_trend: string | null;
+  score_history: ScoreHistoryPoint[];
   check_interval_hours: number;
   is_active: boolean;
+  is_paused: boolean;
   notes: string | null;
   last_checked_at: string | null;
   created_at: string | null;
+}
+
+export interface WatchlistStats {
+  total: number;
+  avg_score: number | null;
+  trending_up: number;
+  trending_down: number;
+  stable: number;
+  new_unchecked: number;
+  paused: number;
+  next_check_at: string | null;
 }
 
 export interface AppNotification {

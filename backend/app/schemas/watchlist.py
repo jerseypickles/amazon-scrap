@@ -13,6 +13,11 @@ class WatchlistAddRequest(BaseModel):
     notes: str | None = None
 
 
+class ScoreHistoryPoint(BaseModel):
+    score: float
+    date: str
+
+
 class WatchlistItemResponse(BaseModel):
     id: int
     keyword: str
@@ -20,8 +25,10 @@ class WatchlistItemResponse(BaseModel):
     last_score: float | None = None
     previous_score: float | None = None
     score_trend: str | None = None
+    score_history: list[ScoreHistoryPoint] = []
     check_interval_hours: int = 24
     is_active: bool = True
+    is_paused: bool = False
     notes: str | None = None
     last_checked_at: datetime | None = None
     created_at: datetime | None = None
