@@ -158,12 +158,34 @@ Tu cliente tiene ${b:,} USD para invertir en Fase 1.
 
 RESPONDE TODO EN ESPAÑOL.
 
+MENTALIDAD CLAVE — VOLUMEN MÍNIMO VIABLE (VMV):
+El objetivo NO es ser el vendedor #1 ni competir cara a cara con Tide, Bounty o Purina.
+El objetivo es GENERAR VENTAS SUFICIENTES para ser rentable. Incluso capturar el 0.01-0.1% de un mercado masivo puede generar $5,000-$50,000/mes.
+
+PARA CADA NICHO debes calcular:
+1. VOLUMEN MÍNIMO VIABLE (VMV): ¿Cuántas unidades/mes necesita vender para ser rentable? (cubrir costos fijos + generar ganancia)
+2. ¿Es realista alcanzar ese VMV? Un vendedor en posición 50-100 del ranking, ¿puede vender X unidades/mes?
+3. En un mercado de $Y millones/mes, ¿qué porcentaje necesitas capturar? Si es 0.01%, es muy alcanzable.
+
+NO seas absolutista. Un mercado "dominado por gigantes" NO significa que sea imposible. Significa que NO serás #1, pero puedes ser un vendedor rentable en posición 30-100.
+
+VENTAJA FBA (MUY IMPORTANTE - EVALUAR SIEMPRE):
+Usar Amazon FBA es una ventaja competitiva REAL que debes evaluar:
+- Badge Prime: el producto aparece con envío gratis 1-2 días. Los compradores filtran por Prime. Sin Prime, pierdes ~70% del tráfico.
+- Buy Box preference: Amazon favorece vendedores FBA en el Buy Box sobre FBM (Fulfilled by Merchant).
+- Confianza del cliente: "Sold by X, Fulfilled by Amazon" genera confianza inmediata. El cliente sabe que si hay problema, Amazon responde.
+- Logística resuelta: no necesitas bodega, no empacas, no envías. Solo reabastecer inventario.
+- Para el modelo de Fase 1 (reventa de marca china): FBA es ESENCIAL. Sin FBA, competir es casi imposible.
+Evalúa cuántos de los competidores actuales usan FBA vs FBM. Si muchos son FBM, hay oportunidad.
+
 METODOLOGÍA DE ANÁLISIS (MUY IMPORTANTE):
 Tu análisis NO debe ser una opinión superficial. Debe ser un ESTUDIO EVALUADO que demuestra que revisaste cada ángulo:
-1. NO digas simplemente "NO ENTRAR" o "ENTRAR". Razona paso a paso: ¿qué dicen los datos? ¿hay formas alternativas de competir?
+1. NO digas simplemente "NO ENTRAR" o "ENTRAR". Razona paso a paso: ¿qué dicen los datos? ¿hay formas alternativas de competir? ¿cuál es el VMV y es alcanzable?
 2. SIEMPRE evalúa Amazon PPC/Ads como vía de entrada. Incluso si las marcas dominan orgánicamente, ¿se puede competir con ads en keywords long-tail?
-3. Si el veredicto es negativo, explica EXACTAMENTE qué tendría que cambiar para que fuera viable (ej: "Si la mediana de reviews bajara a 200, o si encontraras un sub-nicho con menos competencia, sería viable con $X/mes en PPC").
-4. Cada conclusión debe tener su RAZONAMIENTO visible. No conclusiones sin explicación.
+3. SIEMPRE evalúa la ventaja FBA: % de competidores Prime, oportunidad de ganar Buy Box con FBA, impacto en conversión.
+4. Si el veredicto es negativo, explica EXACTAMENTE qué tendría que cambiar para que fuera viable (ej: "Si la mediana de reviews bajara a 200, o si encontraras un sub-nicho con menos competencia, sería viable con $X/mes en PPC").
+5. Cada conclusión debe tener su RAZONAMIENTO visible. No conclusiones sin explicación.
+6. NO asumas que si no puedes ser top 10, fracasarás. Calcula las ventas realistas para posición 30-50-100 y evalúa si eso cubre el VMV.
 
 Analiza estos datos de Amazon US y da inteligencia accionable:
 
@@ -175,6 +197,8 @@ IMPORTANTE:
 - Indica claramente si este nicho REQUIERE marca propia desde el inicio.
 - Evalúa el riesgo de competencia por Buy Box (¿cuántos vendedores podrían vender lo mismo?).
 - Si es consumible: calcula frecuencia de recompra, lifetime value.
+- CALCULA EL VMV: unidades mínimas/mes para breakeven, y evalúa si es realista para un vendedor nuevo con FBA.
+- EVALÚA VENTAJA FBA: % de competidores actuales con Prime, oportunidad de diferenciarse con FBA, impacto en Buy Box y conversión.
 - IMPORTANTE AMAZON PPC: Analiza la viabilidad de usar Amazon Sponsored Products para entrar al nicho. Estima CPC, ACOS, y presupuesto mensual recomendado. Evalúa si PPC hace viable un nicho que orgánicamente parece difícil. Identifica keywords long-tail que podrían tener CPC bajo.
 - IMPORTANTE SUB-NICHOS: Analiza la keyword buscada. Si es un término GENÉRICO/AMPLIO (ej: "dog food", "laundry detergent", "vitamins"), identifica 3-5 sub-nichos más específicos DENTRO de esa misma categoría que podrían ser más viables. Los sub-nichos deben ser keywords reales que alguien buscaría en Amazon (ej: para "dog food" → "grain free dog food small breed", "dog food toppers", "freeze dried dog food", "dog probiotics powder"). Incluye estimación de competencia y viabilidad para cada sub-nicho. Si la keyword ya es específica (ej: "organic dog dental chews"), puedes indicar 0 sub-nichos.
 
@@ -194,7 +218,8 @@ Responde SOLO con JSON válido (sin markdown, sin ```):
         "sin_certificaciones_complejas": true,
         "entrada_generica_viable": true,
         "viable_con_ppc": true,
-        "resumen": "3-5 oraciones con RAZONAMIENTO completo: qué factores analizaste, qué datos sustentan la decisión, qué alternativas consideraste (incluyendo PPC), y bajo qué condiciones cambiaría el veredicto. NO des solo la conclusión — muestra el proceso de pensamiento."
+        "vmv_alcanzable": true,
+        "resumen": "3-5 oraciones con RAZONAMIENTO completo: qué factores analizaste, qué datos sustentan la decisión, qué alternativas consideraste (incluyendo PPC y FBA), y bajo qué condiciones cambiaría el veredicto. INCLUYE el cálculo de VMV: cuántas unidades/mes necesitas y si es realista. NO des solo la conclusión — muestra el proceso de pensamiento."
     }},
     "fase_recomendada": {{
         "fase_actual": "marca_proveedor|marca_privada_necesaria",
@@ -211,6 +236,22 @@ Responde SOLO con JSON válido (sin markdown, sin ```):
         "precio_objetivo": "$XX.XX - razón del precio",
         "rating_objetivo": "4.5+ estrellas - cómo lograrlo"
     }},
+    "volumen_minimo_viable": {{
+        "unidades_mes_breakeven": "XX unidades/mes mínimo para cubrir costos y ser rentable",
+        "porcentaje_mercado_necesario": "0.0X% del mercado total — muy alcanzable|alcanzable|difícil",
+        "ventas_estimadas_posicion_50": "XX-XX unidades/mes (estimación realista para un vendedor en posición 50-100)",
+        "ventas_estimadas_posicion_20": "XX-XX unidades/mes (estimación para posición 20-50)",
+        "ingreso_mensual_realista": "$X,XXX - $X,XXX/mes (basado en posición 50-100)",
+        "vmv_alcanzable": true,
+        "razonamiento_vmv": "2-3 oraciones explicando por qué el VMV es o no es alcanzable. Incluye el tamaño del mercado, la posición realista, y las unidades esperadas."
+    }},
+    "evaluacion_fba": {{
+        "porcentaje_competidores_prime": "XX% de los productos actuales tienen Prime",
+        "oportunidad_fba": "alta|media|baja — qué tan ventajoso es usar FBA en este nicho",
+        "ventaja_buy_box": "Descripción de la ventaja FBA para ganar Buy Box en este nicho",
+        "impacto_conversion": "Estimación de cómo Prime badge mejora conversión (típicamente +20-30%)",
+        "competidores_fbm": "X de Y competidores son FBM — esto es una oportunidad porque..."
+    }},
     "analisis_financiero": {{
         "costo_unitario_china": "$X.XX (FOB China, producto con packaging del proveedor listo)",
         "costo_envio_unidad": "$X.XX (envío marítimo + customs por unidad para MOQ típico)",
@@ -223,7 +264,7 @@ Responde SOLO con JSON válido (sin markdown, sin ```):
         "unidades_con_10k": "XXX unidades (primer pedido con ${b:,})",
         "moq_china": "XXX unidades (mínimo típico del proveedor)",
         "breakeven_unidades": "XXX unidades para recuperar inversión",
-        "roi_6_meses": "XX% (asumiendo X unidades/mes)",
+        "roi_6_meses": "XX% (asumiendo ventas en posición 50-100, NO asumiendo ser top 10)",
         "roi_12_meses": "XX%",
         "ltv_cliente_anual": "$XXX (precio × compras al año si es consumible)"
     }},
@@ -366,7 +407,34 @@ Responde SOLO con JSON válido (sin markdown, sin ```):
                 "no_complex_certs": go_raw.get("sin_certificaciones_complejas", False),
                 "generic_entry_viable": go_raw.get("entrada_generica_viable", False),
                 "viable_with_ppc": go_raw.get("viable_con_ppc", False),
+                "mvv_achievable": go_raw.get("vmv_alcanzable", False),
                 "summary": go_raw.get("resumen", ""),
+            }
+
+        # Minimum Viable Volume
+        vmv_raw = es.get("volumen_minimo_viable", {})
+        min_viable_volume = None
+        if vmv_raw:
+            min_viable_volume = {
+                "units_month_breakeven": vmv_raw.get("unidades_mes_breakeven", ""),
+                "market_percentage_needed": vmv_raw.get("porcentaje_mercado_necesario", ""),
+                "estimated_sales_position_50": vmv_raw.get("ventas_estimadas_posicion_50", ""),
+                "estimated_sales_position_20": vmv_raw.get("ventas_estimadas_posicion_20", ""),
+                "realistic_monthly_revenue": vmv_raw.get("ingreso_mensual_realista", ""),
+                "mvv_achievable": vmv_raw.get("vmv_alcanzable", False),
+                "mvv_reasoning": vmv_raw.get("razonamiento_vmv", ""),
+            }
+
+        # FBA Evaluation
+        fba_raw = es.get("evaluacion_fba", {})
+        fba_evaluation = None
+        if fba_raw:
+            fba_evaluation = {
+                "prime_competitor_percentage": fba_raw.get("porcentaje_competidores_prime", ""),
+                "fba_opportunity": fba_raw.get("oportunidad_fba", ""),
+                "buy_box_advantage": fba_raw.get("ventaja_buy_box", ""),
+                "conversion_impact": fba_raw.get("impacto_conversion", ""),
+                "fbm_competitors": fba_raw.get("competidores_fbm", ""),
             }
 
         # Phase recommendation
@@ -438,6 +506,8 @@ Responde SOLO con JSON válido (sin markdown, sin ```):
             "is_consumable": es.get("es_consumible", True),
             "repurchase_weeks": es.get("frecuencia_recompra_semanas"),
             "go_no_go": go_no_go,
+            "min_viable_volume": min_viable_volume,
+            "fba_evaluation": fba_evaluation,
             "phase_recommendation": phase_recommendation,
             "entry_strategy": {
                 "recommended": entry.get("recomendado", False),

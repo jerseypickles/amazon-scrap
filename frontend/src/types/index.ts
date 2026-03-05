@@ -216,7 +216,26 @@ export interface AIGoNoGo {
   no_complex_certs: boolean;
   generic_entry_viable: boolean;
   viable_with_ppc: boolean;
+  mvv_achievable: boolean;
   summary: string;
+}
+
+export interface AIMinViableVolume {
+  units_month_breakeven: string;
+  market_percentage_needed: string;
+  estimated_sales_position_50: string;
+  estimated_sales_position_20: string;
+  realistic_monthly_revenue: string;
+  mvv_achievable: boolean;
+  mvv_reasoning: string;
+}
+
+export interface AIFBAEvaluation {
+  prime_competitor_percentage: string;
+  fba_opportunity: string;
+  buy_box_advantage: string;
+  conversion_impact: string;
+  fbm_competitors: string;
 }
 
 export interface AIPhaseRecommendation {
@@ -255,6 +274,8 @@ export interface AIInsight {
   is_consumable?: boolean;
   repurchase_weeks?: number;
   go_no_go?: AIGoNoGo;
+  min_viable_volume?: AIMinViableVolume;
+  fba_evaluation?: AIFBAEvaluation;
   phase_recommendation?: AIPhaseRecommendation;
   entry_strategy?: AIEntryStrategy;
   financials?: AIFinancials;

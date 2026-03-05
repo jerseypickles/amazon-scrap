@@ -7,7 +7,7 @@ import {
   ArrowLeft, TrendingUp, Users, DollarSign, Star, ShieldCheck, Search,
   Brain, Eye, Loader2, Lightbulb, AlertTriangle, Target, CheckCircle,
   Factory, Repeat, ExternalLink, Package, Crown, Award, BadgeCheck, Flame, RefreshCw,
-  Layers, Crosshair, BarChart3, Zap, MessageCircle, Send, Megaphone,
+  Layers, Crosshair, BarChart3, Zap, MessageCircle, Send, Megaphone, Truck, BarChart2,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { getAnalysis, getAIAnalysis, refreshAIAnalysis, getAnalysisProducts, addToWatchlist, checkWatchlist, rescrapeAnalysis, aiChat, analyzeNiche, trackProduct } from "@/lib/api";
@@ -617,9 +617,19 @@ export default function AnalysisDetailPage() {
                           Recompra {aiInsight.repurchase_weeks} sem
                         </span>
                       )}
+                      {aiInsight.min_viable_volume?.mvv_achievable && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: "rgba(16,185,129,0.1)", color: "#10b981" }}>
+                          <BarChart2 size={9} className="inline -mt-px mr-0.5" /> VMV Alcanzable
+                        </span>
+                      )}
                       {aiInsight.ppc_strategy?.viable_with_ppc && (
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: "rgba(139,92,246,0.1)", color: "#8b5cf6" }}>
                           <Megaphone size={9} className="inline -mt-px mr-0.5" /> Viable con PPC
+                        </span>
+                      )}
+                      {aiInsight.fba_evaluation?.fba_opportunity === "alta" && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: "rgba(249,115,22,0.1)", color: "#f97316" }}>
+                          <Truck size={9} className="inline -mt-px mr-0.5" /> FBA Ventaja
                         </span>
                       )}
                       {aiCached && (
@@ -680,6 +690,95 @@ export default function AnalysisDetailPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Minimum Viable Volume + FBA Evaluation */}
+          {(aiInsight.min_viable_volume || aiInsight.fba_evaluation) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {aiInsight.min_viable_volume && (
+                <div className="card">
+                  <div className="flex items-center gap-2 mb-3">
+                    <BarChart2 size={16} color="#10b981" />
+                    <h4 className="text-sm font-bold">Volumen M&iacute;nimo Viable</h4>
+                    <span
+                      className="text-[9px] px-1.5 py-0.5 rounded-full font-bold"
+                      style={{
+                        background: aiInsight.min_viable_volume.mvv_achievable ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)",
+                        color: aiInsight.min_viable_volume.mvv_achievable ? "#10b981" : "#ef4444",
+                      }}
+                    >
+                      {aiInsight.min_viable_volume.mvv_achievable ? "Alcanzable" : "Dif\u00edcil"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    {[
+                      { label: "Breakeven/Mes", value: aiInsight.min_viable_volume.units_month_breakeven, color: "#f59e0b" },
+                      { label: "% Mercado Necesario", value: aiInsight.min_viable_volume.market_percentage_needed, color: "#6366f1" },
+                      { label: "Ventas Pos. 50-100", value: aiInsight.min_viable_volume.estimated_sales_position_50, color: "#10b981" },
+                      { label: "Ventas Pos. 20-50", value: aiInsight.min_viable_volume.estimated_sales_position_20, color: "var(--accent)" },
+                    ].map((m) => (
+                      <div key={m.label} className="p-2.5 rounded-xl" style={{ background: "var(--bg-elevated)" }}>
+                        <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>{m.label}</p>
+                        <p className="text-sm font-bold mt-0.5" style={{ color: m.color }}>{m.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {aiInsight.min_viable_volume.realistic_monthly_revenue && (
+                    <div className="p-2.5 rounded-xl mb-3" style={{ background: "rgba(16,185,129,0.05)", border: "1px solid rgba(16,185,129,0.15)" }}>
+                      <p className="text-[10px] font-bold uppercase" style={{ color: "#10b981" }}>Ingreso Mensual Realista</p>
+                      <p className="text-sm font-bold mt-0.5">{aiInsight.min_viable_volume.realistic_monthly_revenue}</p>
+                    </div>
+                  )}
+                  <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                    {aiInsight.min_viable_volume.mvv_reasoning}
+                  </p>
+                </div>
+              )}
+
+              {aiInsight.fba_evaluation && (
+                <div className="card">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Truck size={16} color="#f97316" />
+                    <h4 className="text-sm font-bold">Ventaja FBA</h4>
+                    <span
+                      className="text-[9px] px-1.5 py-0.5 rounded-full font-bold"
+                      style={{
+                        background: aiInsight.fba_evaluation.fba_opportunity === "alta" ? "rgba(16,185,129,0.1)" : aiInsight.fba_evaluation.fba_opportunity === "media" ? "rgba(245,158,11,0.1)" : "rgba(239,68,68,0.1)",
+                        color: aiInsight.fba_evaluation.fba_opportunity === "alta" ? "#10b981" : aiInsight.fba_evaluation.fba_opportunity === "media" ? "#f59e0b" : "#ef4444",
+                      }}
+                    >
+                      Oportunidad {aiInsight.fba_evaluation.fba_opportunity === "alta" ? "Alta" : aiInsight.fba_evaluation.fba_opportunity === "media" ? "Media" : "Baja"}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {aiInsight.fba_evaluation.prime_competitor_percentage && (
+                      <div className="p-2.5 rounded-xl" style={{ background: "var(--bg-elevated)" }}>
+                        <p className="text-[10px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Competidores con Prime</p>
+                        <p className="text-sm font-bold mt-0.5" style={{ color: "#6366f1" }}>{aiInsight.fba_evaluation.prime_competitor_percentage}</p>
+                      </div>
+                    )}
+                    {aiInsight.fba_evaluation.buy_box_advantage && (
+                      <div className="p-2.5 rounded-xl" style={{ background: "var(--bg-elevated)" }}>
+                        <p className="text-[10px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Ventaja Buy Box</p>
+                        <p className="text-xs mt-0.5 leading-relaxed">{aiInsight.fba_evaluation.buy_box_advantage}</p>
+                      </div>
+                    )}
+                    {aiInsight.fba_evaluation.conversion_impact && (
+                      <div className="p-2.5 rounded-xl" style={{ background: "var(--bg-elevated)" }}>
+                        <p className="text-[10px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Impacto en Conversi&oacute;n</p>
+                        <p className="text-xs mt-0.5 leading-relaxed">{aiInsight.fba_evaluation.conversion_impact}</p>
+                      </div>
+                    )}
+                    {aiInsight.fba_evaluation.fbm_competitors && (
+                      <div className="p-2.5 rounded-xl" style={{ background: "rgba(249,115,22,0.05)", border: "1px solid rgba(249,115,22,0.15)" }}>
+                        <p className="text-[10px] font-bold uppercase" style={{ color: "#f97316" }}>Competidores FBM</p>
+                        <p className="text-xs mt-0.5">{aiInsight.fba_evaluation.fbm_competitors}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1366,65 +1465,77 @@ export default function AnalysisDetailPage() {
           </div>
           <h2 className="text-lg font-bold">Ranking de Marcas</h2>
         </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Marca</th>
-                <th style={{ textAlign: "right" }}>Productos</th>
-                <th style={{ textAlign: "right" }}>Cuota</th>
-                <th style={{ textAlign: "right" }}>Precio Prom</th>
-                <th style={{ textAlign: "right" }}>Rating</th>
-                <th style={{ textAlign: "right" }}>Reviews Total</th>
-                <th style={{ textAlign: "center" }}>Badges</th>
-                <th style={{ textAlign: "center" }}>Amenaza</th>
-              </tr>
-            </thead>
-            <tbody>
-              {analysis.top_brands.map((b, i) => (
-                <tr key={b.name}>
-                  <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
-                  <td className="font-medium">{b.name}</td>
-                  <td style={{ textAlign: "right" }}>{b.count}</td>
-                  <td style={{ textAlign: "right" }}>
-                    <span className="font-bold" style={{ color: "var(--accent)" }}>{b.market_share.toFixed(1)}%</span>
-                  </td>
-                  <td style={{ textAlign: "right" }}>{b.avg_price ? `$${b.avg_price.toFixed(2)}` : "--"}</td>
-                  <td style={{ textAlign: "right" }}>{b.avg_rating?.toFixed(1) ?? "--"}</td>
-                  <td style={{ textAlign: "right" }}>{b.total_reviews.toLocaleString()}</td>
-                  <td style={{ textAlign: "center" }}>
-                    <div className="flex items-center justify-center gap-1">
-                      {b.best_seller_count > 0 && (
-                        <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: "rgba(249,115,22,0.1)", color: "#f97316" }} title={`${b.best_seller_count} Best Seller`}>
-                          <Award size={8} className="inline -mt-px" /> {b.best_seller_count}
-                        </span>
-                      )}
-                      {b.amazon_choice_count > 0 && (
-                        <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: "rgba(16,185,129,0.1)", color: "#10b981" }} title={`${b.amazon_choice_count} Amazon Choice`}>
-                          <BadgeCheck size={8} className="inline -mt-px" /> {b.amazon_choice_count}
-                        </span>
-                      )}
-                      {b.has_monthly_bought && (
-                        <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }} title="Tiene ventas mensuales">
-                          <Flame size={8} className="inline -mt-px" />
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td style={{ textAlign: "center" }}>
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{
-                      background: `${threatColor(b.threat_level)}15`,
-                      color: threatColor(b.threat_level),
-                    }}>
-                      {b.threat_level === "high" ? "Alta" : b.threat_level === "medium" ? "Media" : "Baja"}
-                    </span>
-                  </td>
+        {analysis.top_brands.length === 0 ? (
+          <div className="card text-center py-10">
+            <Crown size={24} style={{ color: "var(--text-muted)", margin: "0 auto 8px" }} />
+            <p className="text-sm font-semibold" style={{ color: "var(--text-muted)" }}>
+              No hay datos de marcas disponibles
+            </p>
+            <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+              Haz clic en &ldquo;Recalcular&rdquo; para re-scrapear con datos de marcas actualizados
+            </p>
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Marca</th>
+                  <th style={{ textAlign: "right" }}>Productos</th>
+                  <th style={{ textAlign: "right" }}>Cuota</th>
+                  <th style={{ textAlign: "right" }}>Precio Prom</th>
+                  <th style={{ textAlign: "right" }}>Rating</th>
+                  <th style={{ textAlign: "right" }}>Reviews Total</th>
+                  <th style={{ textAlign: "center" }}>Badges</th>
+                  <th style={{ textAlign: "center" }}>Amenaza</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {analysis.top_brands.map((b, i) => (
+                  <tr key={b.name}>
+                    <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
+                    <td className="font-medium">{b.name}</td>
+                    <td style={{ textAlign: "right" }}>{b.count}</td>
+                    <td style={{ textAlign: "right" }}>
+                      <span className="font-bold" style={{ color: "var(--accent)" }}>{b.market_share.toFixed(1)}%</span>
+                    </td>
+                    <td style={{ textAlign: "right" }}>{b.avg_price ? `$${b.avg_price.toFixed(2)}` : "--"}</td>
+                    <td style={{ textAlign: "right" }}>{b.avg_rating?.toFixed(1) ?? "--"}</td>
+                    <td style={{ textAlign: "right" }}>{b.total_reviews.toLocaleString()}</td>
+                    <td style={{ textAlign: "center" }}>
+                      <div className="flex items-center justify-center gap-1">
+                        {b.best_seller_count > 0 && (
+                          <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: "rgba(249,115,22,0.1)", color: "#f97316" }} title={`${b.best_seller_count} Best Seller`}>
+                            <Award size={8} className="inline -mt-px" /> {b.best_seller_count}
+                          </span>
+                        )}
+                        {b.amazon_choice_count > 0 && (
+                          <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: "rgba(16,185,129,0.1)", color: "#10b981" }} title={`${b.amazon_choice_count} Amazon Choice`}>
+                            <BadgeCheck size={8} className="inline -mt-px" /> {b.amazon_choice_count}
+                          </span>
+                        )}
+                        {b.has_monthly_bought && (
+                          <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }} title="Tiene ventas mensuales">
+                            <Flame size={8} className="inline -mt-px" />
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td style={{ textAlign: "center" }}>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{
+                        background: `${threatColor(b.threat_level)}15`,
+                        color: threatColor(b.threat_level),
+                      }}>
+                        {b.threat_level === "high" ? "Alta" : b.threat_level === "medium" ? "Media" : "Baja"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Summary — data-based quick verdict */}
