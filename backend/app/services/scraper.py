@@ -276,17 +276,56 @@ class AmazonScraper:
                         "author": rev.get("username"),
                     })
 
+        # ── Additional fields from Product API ──
+        full_description = data.get("full_description") or None
+        list_price = None
+        lp_str = data.get("list_price")
+        if isinstance(lp_str, str):
+            lp_match = re.search(r"\$?([\d,]+\.?\d*)", lp_str)
+            if lp_match:
+                try:
+                    list_price = float(lp_match.group(1).replace(",", ""))
+                except ValueError:
+                    pass
+        elif isinstance(lp_str, (int, float)):
+            list_price = float(lp_str)
+
+        ships_from = data.get("ships_from") or None
+        total_answered_questions = None
+        taq = data.get("total_answered_questions")
+        if taq is not None:
+            try:
+                total_answered_questions = int(taq)
+            except (ValueError, TypeError):
+                pass
+
+        small_description = data.get("small_description") or None
+        brand_url = data.get("brand_url") or None
+
+        # Dynamic product_information fields (category-specific)
+        product_info_extra: dict = {}
+        if isinstance(product_info, dict):
+            skip_keys = {"product_dimensions", "item_weight", "manufacturer",
+                         "date_first_available", "item_model_number", "asin",
+                         "best_sellers_rank", "customer_reviews"}
+            for k, v in product_info.items():
+                if k not in skip_keys and v:
+                    product_info_extra[k] = str(v)
+
         return {
             "asin": asin,
             "title": title,
             "brand": brand,
             "price": price,
+            "list_price": list_price,
             "rating": rating,
             "total_ratings": total_ratings,
             "total_reviews": total_reviews,
             "bsr": bsr,
             "bsr_category": bsr_category,
             "description": description,
+            "full_description": full_description,
+            "small_description": small_description,
             "features": features,
             "feature_bullets": feature_bullets,
             "seller_name": seller_name,
@@ -294,6 +333,7 @@ class AmazonScraper:
             "availability": availability,
             "shipping_price": shipping_price,
             "shipping_condition": shipping_condition,
+            "ships_from": ships_from,
             "has_coupon": has_coupon,
             "has_aplus": has_aplus,
             "rating_breakdown": rating_breakdown or None,
@@ -302,10 +342,79 @@ class AmazonScraper:
             "manufacturer": manufacturer,
             "date_first_available": date_first_available,
             "model_number": model_number,
+            "brand_url": brand_url,
+            "total_answered_questions": total_answered_questions,
+            "product_info_extra": product_info_extra or None,
             "images": images or None,
             "variations": variations or None,
             "top_reviews": top_reviews or None,
         }
+
+    async def _structured_offers(self, asin: str) -> list[dict]:
+        """Use ScraperAPI structured Amazon offers endpoint.
+
+        Returns all sellers/offers for an ASIN with pricing, Prime, FBA status.
+        Costs 1 extra API credit per call.
+        """
+        url = (
+            f"{SCRAPER_API_BASE}/structured/amazon/offers"
+            f"?api_key={self.api_key}"
+            f"&asin={asin}"
+            f"&country_code=us"
+        )
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            try:
+                resp = await client.get(url)
+                if resp.status_code != 200:
+                    logger.warning("Structured offers got status %d for %s", resp.status_code, asin)
+                    return []
+                data = resp.json()
+            except (httpx.HTTPError, ValueError) as e:
+                logger.error("Structured offers error for %s: %s", asin, e)
+                return []
+
+        offers_raw = data.get("offers", [])
+        if not isinstance(offers_raw, list):
+            return []
+
+        offers: list[dict] = []
+        for o in offers_raw[:20]:
+            if not isinstance(o, dict):
+                continue
+            offer_price = None
+            price_val = o.get("price")
+            if isinstance(price_val, (int, float)):
+                offer_price = float(price_val)
+            elif isinstance(price_val, str):
+                pm = re.search(r"\$?([\d,]+\.?\d*)", price_val)
+                if pm:
+                    try:
+                        offer_price = float(pm.group(1).replace(",", ""))
+                    except ValueError:
+                        pass
+
+            offers.append({
+                "seller_name": o.get("seller_name") or o.get("sold_by") or "Unknown",
+                "seller_id": o.get("seller_id") or None,
+                "price": offer_price,
+                "shipping_price": o.get("shipping_price") or None,
+                "condition": o.get("condition") or "New",
+                "is_prime": bool(o.get("is_prime")),
+                "is_fba": bool(o.get("is_fba") or o.get("fulfilled_by_amazon")),
+                "seller_rating": o.get("seller_rating") or None,
+                "seller_reviews_count": o.get("seller_num_ratings") or o.get("seller_reviews") or None,
+                "delivery_info": o.get("delivery") or o.get("delivery_info") or None,
+                "is_buy_box_winner": bool(o.get("is_buybox_winner") or o.get("buy_box_winner")),
+            })
+
+        logger.info("Structured offers: %s → %d offers", asin, len(offers))
+        return offers
+
+    async def get_offers(self, asin: str) -> list[dict]:
+        """Get all seller offers for an ASIN."""
+        if not self.use_api:
+            return []
+        return await self._structured_offers(asin)
 
     # ── Public API (auto-selects structured vs HTML) ──────────────────
 

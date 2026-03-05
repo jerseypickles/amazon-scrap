@@ -89,6 +89,25 @@ class ProductTracker:
             parts = [p for p in [detail_data.get("shipping_price"), detail_data.get("shipping_condition")] if p]
             shipping_info = " - ".join(parts) if parts else None
 
+        # Fetch seller offers (Offers API)
+        offers_data: list[dict] = []
+        offers_meta: dict = {}
+        if scraper.use_api:
+            try:
+                offers_data = await scraper.get_offers(asin)
+                if offers_data:
+                    prices = [o["price"] for o in offers_data if o.get("price")]
+                    fba_count = sum(1 for o in offers_data if o.get("is_fba"))
+                    buy_box = next((o["seller_name"] for o in offers_data if o.get("is_buy_box_winner")), None)
+                    offers_meta = {
+                        "total_offers": len(offers_data),
+                        "lowest_offer_price": min(prices) if prices else None,
+                        "fba_seller_count": fba_count,
+                        "buy_box_seller": buy_box,
+                    }
+            except Exception as e:
+                logger.warning("Could not fetch offers for %s: %s", asin, e)
+
         pid = await _database.get_next_id("tracked_products")
         doc = new_tracked_product_doc(
             pid,
@@ -127,6 +146,17 @@ class ProductTracker:
             top_reviews=detail_data.get("top_reviews"),
             total_ratings=detail_data.get("total_ratings"),
             shipping_info=shipping_info,
+            ships_from=detail_data.get("ships_from"),
+            # New Product API fields
+            list_price=detail_data.get("list_price"),
+            full_description=detail_data.get("full_description"),
+            small_description=detail_data.get("small_description"),
+            brand_url=detail_data.get("brand_url"),
+            total_answered_questions=detail_data.get("total_answered_questions"),
+            product_info_extra=detail_data.get("product_info_extra"),
+            # Offers data
+            offers=offers_data or None,
+            **offers_meta,
         )
         await _database.db.tracked_products.insert_one(doc)
 
@@ -351,6 +381,37 @@ class ProductTracker:
             parts = [p for p in [detail.get("shipping_price"), detail.get("shipping_condition")] if p]
             if parts:
                 update_set["shipping_info"] = " - ".join(parts)
+            # New Product API fields
+            if detail.get("ships_from"):
+                update_set["ships_from"] = detail["ships_from"]
+            if detail.get("list_price"):
+                update_set["list_price"] = detail["list_price"]
+            if detail.get("full_description"):
+                update_set["full_description"] = detail["full_description"]
+            if detail.get("small_description"):
+                update_set["small_description"] = detail["small_description"]
+            if detail.get("brand_url"):
+                update_set["brand_url"] = detail["brand_url"]
+            if detail.get("total_answered_questions") is not None:
+                update_set["total_answered_questions"] = detail["total_answered_questions"]
+            if detail.get("product_info_extra"):
+                update_set["product_info_extra"] = detail["product_info_extra"]
+
+        # Refresh offers data
+        try:
+            offers_data = await scraper.get_offers(asin)
+            if offers_data:
+                update_set["offers"] = offers_data
+                update_set["total_offers"] = len(offers_data)
+                prices = [o["price"] for o in offers_data if o.get("price")]
+                if prices:
+                    update_set["lowest_offer_price"] = min(prices)
+                update_set["fba_seller_count"] = sum(1 for o in offers_data if o.get("is_fba"))
+                buy_box = next((o["seller_name"] for o in offers_data if o.get("is_buy_box_winner")), None)
+                if buy_box:
+                    update_set["buy_box_seller"] = buy_box
+        except Exception as e:
+            logger.warning("Could not refresh offers for %s: %s", asin, e)
 
         await _database.db.tracked_products.update_one(
             {"_id": item["_id"]},

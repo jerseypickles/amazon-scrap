@@ -8,7 +8,8 @@ import {
   BadgeCheck, Star, Flame, Loader2, Search, Plus, Minus,
   AlertTriangle, Hash, ShieldCheck, Truck, Tag, Info,
   Box, Weight, Factory, Calendar, User, MessageSquare,
-  CheckCircle2, Image as ImageIcon, Layers,
+  CheckCircle2, Image as ImageIcon, Layers, Users,
+  ShoppingCart, MapPin, HelpCircle, Store,
 } from "lucide-react";
 import {
   getTrackedProducts, getTrackedProductStats, refreshTrackedProduct,
@@ -171,6 +172,12 @@ function DetailPanel({ product, onClose }: { product: TrackedProduct; onClose: (
             <div className="card text-center">
               <DollarSign size={14} color="#10b981" className="mx-auto mb-1" />
               <p className="text-lg font-black" style={{ color: "#10b981" }}>${product.current_price?.toFixed(2) || "--"}</p>
+              {product.list_price && product.current_price && product.list_price > product.current_price && (
+                <p className="text-[10px]" style={{ color: "#ef4444" }}>
+                  <span style={{ textDecoration: "line-through" }}>${product.list_price.toFixed(2)}</span>
+                  {" "}-{Math.round(((product.list_price - product.current_price) / product.list_price) * 100)}%
+                </p>
+              )}
               <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>Precio actual</p>
             </div>
             <div className="card text-center">
@@ -188,9 +195,87 @@ function DetailPanel({ product, onClose }: { product: TrackedProduct; onClose: (
             <div className="card text-center">
               <BarChart3 size={14} color="#ec4899" className="mx-auto mb-1" />
               <p className="text-lg font-black" style={{ color: "#ec4899" }}>{product.current_reviews?.toLocaleString() || "--"}</p>
-              <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>Reviews</p>
+              <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                Reviews{product.total_answered_questions ? ` | ${product.total_answered_questions} Q&A` : ""}
+              </p>
             </div>
           </div>
+
+          {/* Seller Competition (Offers) */}
+          {product.offers && product.offers.length > 0 && (
+            <div className="card mb-4">
+              <p className="text-xs font-bold mb-3 flex items-center gap-1.5">
+                <Users size={12} color="#f97316" /> Competencia de Sellers ({product.total_offers || product.offers.length} ofertas)
+              </p>
+              {/* Summary */}
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <div className="text-center p-2 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
+                  <p className="text-sm font-black" style={{ color: "#10b981" }}>${product.lowest_offer_price?.toFixed(2) || "--"}</p>
+                  <p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Precio mas bajo</p>
+                </div>
+                <div className="text-center p-2 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
+                  <p className="text-sm font-black" style={{ color: "#6366f1" }}>{product.fba_seller_count ?? 0}</p>
+                  <p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Sellers FBA</p>
+                </div>
+                <div className="text-center p-2 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
+                  <p className="text-sm font-black truncate" style={{ color: "#f97316" }}>{product.buy_box_seller || "--"}</p>
+                  <p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Buy Box</p>
+                </div>
+              </div>
+              {/* Offers table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-[10px]">
+                  <thead>
+                    <tr style={{ color: "var(--text-muted)" }}>
+                      <th className="text-left py-1">Seller</th>
+                      <th className="text-right py-1">Precio</th>
+                      <th className="text-center py-1">Prime</th>
+                      <th className="text-center py-1">FBA</th>
+                      <th className="text-center py-1">Condicion</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {product.offers.slice(0, 10).map((offer, i) => (
+                      <tr key={i} style={{ borderTop: "1px solid var(--border)" }}>
+                        <td className="py-1.5 max-w-[140px] truncate">
+                          <div className="flex items-center gap-1">
+                            {offer.is_buy_box_winner && <ShoppingCart size={9} color="#f97316" />}
+                            <span className={offer.is_buy_box_winner ? "font-bold" : ""}>{offer.seller_name}</span>
+                          </div>
+                          {offer.seller_rating && (
+                            <span className="text-[8px]" style={{ color: "var(--text-muted)" }}>
+                              Rating: {offer.seller_rating}
+                            </span>
+                          )}
+                        </td>
+                        <td className="text-right py-1.5 font-bold">{offer.price ? `$${offer.price.toFixed(2)}` : "--"}</td>
+                        <td className="text-center py-1.5">
+                          {offer.is_prime ? (
+                            <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: "rgba(16,185,129,0.12)", color: "#10b981" }}>SI</span>
+                          ) : (
+                            <span className="text-[8px]" style={{ color: "var(--text-muted)" }}>No</span>
+                          )}
+                        </td>
+                        <td className="text-center py-1.5">
+                          {offer.is_fba ? (
+                            <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: "rgba(99,102,241,0.12)", color: "#6366f1" }}>FBA</span>
+                          ) : (
+                            <span className="text-[8px]" style={{ color: "var(--text-muted)" }}>FBM</span>
+                          )}
+                        </td>
+                        <td className="text-center py-1.5 text-[9px]">{offer.condition}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {product.offers.length > 10 && (
+                  <p className="text-[9px] mt-1 text-center" style={{ color: "var(--text-muted)" }}>
+                    +{product.offers.length - 10} ofertas mas
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Rating Breakdown */}
           {rb && Object.keys(rb).length > 0 && (
@@ -241,7 +326,7 @@ function DetailPanel({ product, onClose }: { product: TrackedProduct; onClose: (
           )}
 
           {/* Product Info Grid */}
-          {(product.seller_name || product.dimensions || product.weight || product.date_first_available || product.model_number || product.shipping_info) && (
+          {(product.seller_name || product.dimensions || product.weight || product.date_first_available || product.model_number || product.shipping_info || product.ships_from) && (
             <div className="card mb-4">
               <p className="text-xs font-bold mb-3 flex items-center gap-1.5"><Info size={12} color="#6366f1" /> Informacion del Producto</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-2">
@@ -287,6 +372,13 @@ function DetailPanel({ product, onClose }: { product: TrackedProduct; onClose: (
                     <span className="text-[10px] font-bold">{product.date_first_available}</span>
                   </div>
                 )}
+                {product.ships_from && (
+                  <div className="flex items-center gap-1.5">
+                    <MapPin size={10} style={{ color: "var(--text-muted)" }} />
+                    <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>Envio desde:</span>
+                    <span className="text-[10px] font-bold">{product.ships_from}</span>
+                  </div>
+                )}
                 {product.shipping_info && (
                   <div className="flex items-center gap-1.5 col-span-2">
                     <Truck size={10} style={{ color: "var(--text-muted)" }} />
@@ -294,6 +386,32 @@ function DetailPanel({ product, onClose }: { product: TrackedProduct; onClose: (
                     <span className="text-[10px] font-bold">{product.shipping_info}</span>
                   </div>
                 )}
+                {product.brand_url && (
+                  <div className="flex items-center gap-1.5 col-span-2">
+                    <Store size={10} style={{ color: "var(--text-muted)" }} />
+                    <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>Brand Store:</span>
+                    <a href={product.brand_url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold" style={{ color: "var(--accent)" }}>
+                      Ver tienda
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Extra Product Info (category-specific fields) */}
+          {product.product_info_extra && Object.keys(product.product_info_extra).length > 0 && (
+            <div className="card mb-4">
+              <p className="text-xs font-bold mb-3 flex items-center gap-1.5"><HelpCircle size={12} color="#8b5cf6" /> Datos Adicionales</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                {Object.entries(product.product_info_extra).map(([key, val]) => (
+                  <div key={key} className="flex items-start gap-1.5">
+                    <span className="text-[10px] capitalize" style={{ color: "var(--text-muted)" }}>
+                      {key.replace(/_/g, " ")}:
+                    </span>
+                    <span className="text-[10px] font-bold">{val}</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -333,12 +451,27 @@ function DetailPanel({ product, onClose }: { product: TrackedProduct; onClose: (
           )}
 
           {/* Description */}
-          {product.description && (
+          {(product.description || product.full_description || product.small_description) && (
             <div className="card mb-4">
               <p className="text-xs font-bold mb-2">Descripcion</p>
-              <p className="text-[11px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                {product.description.slice(0, 800)}{product.description.length > 800 ? "..." : ""}
-              </p>
+              {product.small_description && (
+                <p className="text-[11px] font-medium mb-2" style={{ color: "var(--text-primary)" }}>
+                  {product.small_description}
+                </p>
+              )}
+              {product.description && (
+                <p className="text-[11px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                  {product.description.slice(0, 800)}{product.description.length > 800 ? "..." : ""}
+                </p>
+              )}
+              {product.full_description && product.full_description !== product.description && (
+                <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
+                  <p className="text-[10px] font-bold mb-1" style={{ color: "var(--text-muted)" }}>A+ / Extended Description</p>
+                  <p className="text-[10px] leading-relaxed" style={{ color: "var(--text-muted)" }}>
+                    {product.full_description.slice(0, 600)}{product.full_description.length > 600 ? "..." : ""}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

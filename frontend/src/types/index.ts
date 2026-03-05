@@ -372,6 +372,20 @@ export interface ProductVariation {
   values: string[];
 }
 
+export interface OfferItem {
+  seller_name: string;
+  seller_id: string | null;
+  price: number | null;
+  shipping_price: string | null;
+  condition: string;
+  is_prime: boolean;
+  is_fba: boolean;
+  seller_rating: string | null;
+  seller_reviews_count: number | null;
+  delivery_info: string | null;
+  is_buy_box_winner: boolean;
+}
+
 export interface TrackedProduct {
   id: number;
   asin: string;
@@ -408,6 +422,20 @@ export interface TrackedProduct {
   top_reviews: ProductReview[] | null;
   total_ratings: number | null;
   shipping_info: string | null;
+  ships_from: string | null;
+  // Additional product data
+  list_price: number | null;
+  full_description: string | null;
+  small_description: string | null;
+  brand_url: string | null;
+  total_answered_questions: number | null;
+  product_info_extra: Record<string, string> | null;
+  // Seller competition (from Offers API)
+  offers: OfferItem[] | null;
+  total_offers: number | null;
+  buy_box_seller: string | null;
+  lowest_offer_price: number | null;
+  fba_seller_count: number | null;
   // Tracking
   snapshots: ProductSnapshot[];
   check_interval_hours: number;

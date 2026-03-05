@@ -92,6 +92,20 @@ def new_tracked_product_doc(id: int, **fields) -> dict:
         "top_reviews": fields.get("top_reviews"),
         "total_ratings": fields.get("total_ratings"),
         "shipping_info": fields.get("shipping_info"),
+        "ships_from": fields.get("ships_from"),
+        # Additional product data
+        "list_price": fields.get("list_price"),
+        "full_description": fields.get("full_description"),
+        "small_description": fields.get("small_description"),
+        "brand_url": fields.get("brand_url"),
+        "total_answered_questions": fields.get("total_answered_questions"),
+        "product_info_extra": fields.get("product_info_extra"),
+        # Seller competition (from Offers API)
+        "offers": fields.get("offers"),
+        "total_offers": fields.get("total_offers"),
+        "buy_box_seller": fields.get("buy_box_seller"),
+        "lowest_offer_price": fields.get("lowest_offer_price"),
+        "fba_seller_count": fields.get("fba_seller_count"),
         # Tracking metadata
         "snapshots": initial_snapshot,
         "check_interval_hours": fields.get("check_interval_hours", 24),

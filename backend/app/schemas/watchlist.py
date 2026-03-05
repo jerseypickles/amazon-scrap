@@ -75,6 +75,20 @@ class ProductVariation(BaseModel):
     values: list[str] = []
 
 
+class OfferItem(BaseModel):
+    seller_name: str = "Unknown"
+    seller_id: str | None = None
+    price: float | None = None
+    shipping_price: str | None = None
+    condition: str = "New"
+    is_prime: bool = False
+    is_fba: bool = False
+    seller_rating: str | None = None
+    seller_reviews_count: int | None = None
+    delivery_info: str | None = None
+    is_buy_box_winner: bool = False
+
+
 class TrackedProductResponse(BaseModel):
     id: int
     asin: str
@@ -111,6 +125,20 @@ class TrackedProductResponse(BaseModel):
     top_reviews: list[ProductReview] | None = None
     total_ratings: int | None = None
     shipping_info: str | None = None
+    ships_from: str | None = None
+    # Additional product data
+    list_price: float | None = None
+    full_description: str | None = None
+    small_description: str | None = None
+    brand_url: str | None = None
+    total_answered_questions: int | None = None
+    product_info_extra: dict | None = None
+    # Seller competition (from Offers API)
+    offers: list[OfferItem] | None = None
+    total_offers: int | None = None
+    buy_box_seller: str | None = None
+    lowest_offer_price: float | None = None
+    fba_seller_count: int | None = None
     # Tracking
     snapshots: list[ProductSnapshot] = []
     check_interval_hours: int = 24
