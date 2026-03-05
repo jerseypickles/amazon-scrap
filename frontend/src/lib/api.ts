@@ -11,6 +11,8 @@ import type {
   WatchlistStats,
   AppNotification,
   SmartNichesResponse,
+  TrackedProduct,
+  TrackedProductStats,
 } from "@/types";
 
 const API_BASE = "/api";
@@ -199,4 +201,58 @@ export async function markNotificationRead(id: number): Promise<void> {
 
 export async function markAllNotificationsRead(): Promise<void> {
   return fetchAPI("/watchlist/notifications/read-all", { method: "PUT" });
+}
+
+// ASIN Tracker
+export async function getTrackedProducts(): Promise<{ total: number; items: TrackedProduct[] }> {
+  return fetchAPI("/tracked-products");
+}
+
+export async function trackProduct(data: {
+  asin: string;
+  title?: string;
+  brand?: string;
+  price?: number;
+  rating?: number;
+  reviews_count?: number;
+  bsr?: number;
+  bsr_category?: string;
+  image_url?: string;
+  product_url?: string;
+  is_best_seller?: boolean;
+  is_amazon_choice?: boolean;
+  monthly_bought?: string;
+  from_keyword?: string;
+  from_analysis_id?: number;
+  notes?: string;
+  interval_hours?: number;
+}): Promise<TrackedProduct> {
+  return fetchAPI("/tracked-products", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getTrackedProductStats(): Promise<TrackedProductStats> {
+  return fetchAPI("/tracked-products/stats");
+}
+
+export async function checkTrackedProduct(asin: string): Promise<{ tracked: boolean; item_id: number | null }> {
+  return fetchAPI(`/tracked-products/check/${encodeURIComponent(asin)}`);
+}
+
+export async function getTrackedProduct(productId: number): Promise<TrackedProduct> {
+  return fetchAPI(`/tracked-products/${productId}`);
+}
+
+export async function refreshTrackedProduct(productId: number): Promise<TrackedProduct> {
+  return fetchAPI(`/tracked-products/${productId}/refresh`, { method: "POST" });
+}
+
+export async function togglePauseTracked(productId: number): Promise<TrackedProduct> {
+  return fetchAPI(`/tracked-products/${productId}/pause`, { method: "PUT" });
+}
+
+export async function removeTrackedProduct(productId: number): Promise<void> {
+  return fetchAPI(`/tracked-products/${productId}`, { method: "DELETE" });
 }

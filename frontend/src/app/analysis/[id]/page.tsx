@@ -10,7 +10,7 @@ import {
   Layers, Crosshair, BarChart3, Zap, MessageCircle, Send,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { getAnalysis, getAIAnalysis, refreshAIAnalysis, getAnalysisProducts, addToWatchlist, checkWatchlist, rescrapeAnalysis, aiChat, analyzeNiche } from "@/lib/api";
+import { getAnalysis, getAIAnalysis, refreshAIAnalysis, getAnalysisProducts, addToWatchlist, checkWatchlist, rescrapeAnalysis, aiChat, analyzeNiche, trackProduct } from "@/lib/api";
 import type { NicheAnalysis, AIInsight, Product, ScoreBreakdown } from "@/types";
 
 interface ChatMessage {
@@ -115,7 +115,7 @@ function severityColor(s: string) {
   return "var(--success)";
 }
 
-function ProductCard({ p, rank }: { p: Product; rank: number }) {
+function ProductCard({ p, rank, onTrack, tracking }: { p: Product; rank: number; onTrack?: (p: Product) => void; tracking?: boolean }) {
   return (
     <div
       className="rounded-xl p-3 flex gap-3 transition-all hover:scale-[1.01]"
@@ -211,19 +211,32 @@ function ProductCard({ p, rank }: { p: Product; rank: number }) {
         </div>
       </div>
 
-      {/* Amazon link */}
-      {p.product_url && (
-        <a
-          href={p.product_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex-shrink-0 self-center p-2 rounded-lg transition-colors"
-          style={{ background: "rgba(249,115,22,0.08)" }}
-          title="Ver en Amazon"
-        >
-          <ExternalLink size={14} color="var(--accent)" />
-        </a>
-      )}
+      {/* Actions */}
+      <div className="flex flex-col gap-1 flex-shrink-0 self-center">
+        {onTrack && (
+          <button
+            onClick={() => onTrack(p)}
+            disabled={tracking}
+            className="p-2 rounded-lg transition-colors"
+            style={{ background: "rgba(99,102,241,0.08)" }}
+            title="Trackear ASIN"
+          >
+            {tracking ? <Loader2 size={14} className="animate-spin" color="#6366f1" /> : <Package size={14} color="#6366f1" />}
+          </button>
+        )}
+        {p.product_url && (
+          <a
+            href={p.product_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-2 rounded-lg transition-colors"
+            style={{ background: "rgba(249,115,22,0.08)" }}
+            title="Ver en Amazon"
+          >
+            <ExternalLink size={14} color="var(--accent)" />
+          </a>
+        )}
+      </div>
     </div>
   );
 }
@@ -261,6 +274,34 @@ export default function AnalysisDetailPage() {
 
   // Watch state
   const [watched, setWatched] = useState(false);
+
+  // ASIN tracking state
+  const [trackingAsin, setTrackingAsin] = useState<string | null>(null);
+  const [trackedAsins, setTrackedAsins] = useState<Set<string>>(new Set());
+
+  async function handleTrackProduct(p: Product) {
+    if (!analysis) return;
+    setTrackingAsin(p.asin);
+    try {
+      await trackProduct({
+        asin: p.asin,
+        title: p.title,
+        brand: p.brand || undefined,
+        price: p.price || undefined,
+        rating: p.rating || undefined,
+        reviews_count: p.reviews_count || undefined,
+        image_url: p.image_url || undefined,
+        product_url: p.product_url || undefined,
+        is_best_seller: p.is_best_seller || false,
+        is_amazon_choice: p.is_amazon_choice || false,
+        monthly_bought: p.monthly_bought || undefined,
+        from_keyword: analysis.keyword,
+        from_analysis_id: analysis.id,
+      });
+      setTrackedAsins((prev) => new Set(prev).add(p.asin));
+    } catch { /* ignore */ }
+    setTrackingAsin(null);
+  }
 
   useEffect(() => {
     const id = Number(params.id);
@@ -1159,7 +1200,7 @@ export default function AnalysisDetailPage() {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {visibleProducts.map((p, i) => (
-                <ProductCard key={p.asin} p={p} rank={i + 1} />
+                <ProductCard key={p.asin} p={p} rank={i + 1} onTrack={trackedAsins.has(p.asin) ? undefined : handleTrackProduct} tracking={trackingAsin === p.asin} />
               ))}
             </div>
             {products.length > 15 && (

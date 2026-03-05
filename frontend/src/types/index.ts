@@ -345,3 +345,53 @@ export interface SmartNichesResponse {
   total: number;
   analyzed_count: number;
 }
+
+// ASIN Tracker types
+export interface ProductSnapshot {
+  date: string;
+  price: number | null;
+  bsr: number | null;
+  rating: number | null;
+  reviews_count: number | null;
+  is_best_seller: boolean;
+  is_amazon_choice: boolean;
+  monthly_bought: string | null;
+}
+
+export interface TrackedProduct {
+  id: number;
+  asin: string;
+  title: string;
+  brand: string | null;
+  image_url: string | null;
+  product_url: string | null;
+  category: string | null;
+  current_price: number | null;
+  current_bsr: number | null;
+  current_bsr_category: string | null;
+  current_rating: number | null;
+  current_reviews: number | null;
+  current_is_best_seller: boolean;
+  current_is_amazon_choice: boolean;
+  current_monthly_bought: string | null;
+  features: string | null;
+  description: string | null;
+  snapshots: ProductSnapshot[];
+  check_interval_hours: number;
+  is_active: boolean;
+  is_paused: boolean;
+  notes: string | null;
+  from_keyword: string | null;
+  from_analysis_id: number | null;
+  last_checked_at: string | null;
+  created_at: string | null;
+}
+
+export interface TrackedProductStats {
+  total: number;
+  avg_bsr: number | null;
+  avg_price: number | null;
+  paused: number;
+  best_sellers: number;
+  limit: number;
+}

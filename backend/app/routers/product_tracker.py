@@ -1,0 +1,99 @@
+from __future__ import annotations
+
+from fastapi import APIRouter, HTTPException
+
+from app.schemas.watchlist import TrackProductRequest, TrackedProductResponse
+from app.services.product_tracker import product_tracker
+
+router = APIRouter(prefix="/api/tracked-products", tags=["product-tracker"])
+
+
+def _doc_to_response(doc: dict) -> TrackedProductResponse:
+    d = {k: v for k, v in doc.items() if k != "_id"}
+    return TrackedProductResponse(**d)
+
+
+@router.get("")
+async def get_tracked_products():
+    items = await product_tracker.get_tracked_products()
+    return {
+        "total": len(items),
+        "items": [_doc_to_response(item) for item in items],
+    }
+
+
+@router.post("")
+async def track_product(request: TrackProductRequest):
+    try:
+        item = await product_tracker.track_product(
+            asin=request.asin,
+            title=request.title,
+            brand=request.brand,
+            price=request.price,
+            rating=request.rating,
+            reviews_count=request.reviews_count,
+            bsr=request.bsr,
+            bsr_category=request.bsr_category,
+            image_url=request.image_url,
+            product_url=request.product_url,
+            is_best_seller=request.is_best_seller,
+            is_amazon_choice=request.is_amazon_choice,
+            monthly_bought=request.monthly_bought,
+            from_keyword=request.from_keyword,
+            from_analysis_id=request.from_analysis_id,
+            notes=request.notes,
+            interval_hours=request.interval_hours,
+        )
+        return _doc_to_response(item)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/stats")
+async def get_stats():
+    return await product_tracker.get_stats()
+
+
+@router.get("/check/{asin}")
+async def check_tracked(asin: str):
+    return await product_tracker.check_tracked(asin)
+
+
+@router.get("/{product_id}")
+async def get_tracked_product(product_id: int):
+    item = await product_tracker.get_tracked_product(product_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Tracked product not found")
+    return _doc_to_response(item)
+
+
+@router.post("/{product_id}/refresh")
+async def force_refresh(product_id: int):
+    item = await product_tracker.force_refresh(product_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Tracked product not found")
+    return _doc_to_response(item)
+
+
+@router.put("/{product_id}/pause")
+async def toggle_pause(product_id: int):
+    item = await product_tracker.toggle_pause(product_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Tracked product not found")
+    return _doc_to_response(item)
+
+
+@router.put("/{product_id}/notes")
+async def update_notes(product_id: int, body: dict):
+    item = await product_tracker.update_notes(product_id, body.get("notes", ""))
+    if not item:
+        raise HTTPException(status_code=404, detail="Tracked product not found")
+    return _doc_to_response(item)
+
+
+@router.delete("/{product_id}")
+async def remove_tracked(product_id: int):
+    removed = await product_tracker.remove_tracked(product_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Tracked product not found")
+    return {"status": "removed"}

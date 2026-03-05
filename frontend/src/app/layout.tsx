@@ -16,6 +16,7 @@ import {
   ExternalLink,
   Repeat,
   DollarSign,
+  Package,
 } from "lucide-react";
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from "@/lib/api";
 import type { AppNotification } from "@/types";
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/search", label: "Analizar Nicho", icon: Search },
   { href: "/watchlist", label: "Watchlist", icon: Eye },
+  { href: "/products", label: "ASIN Tracker", icon: Package },
   { href: "/history", label: "Historial", icon: Clock },
   { href: "/categories", label: "Categorías", icon: FolderTree },
 ];

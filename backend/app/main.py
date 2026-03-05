@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import init_db, close_db
 from app.routers import analysis, categories, search
-from app.routers import ai_advisor, watchlist
+from app.routers import ai_advisor, watchlist, product_tracker
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -31,6 +31,7 @@ app.include_router(categories.router)
 app.include_router(analysis.router)
 app.include_router(ai_advisor.router)
 app.include_router(watchlist.router)
+app.include_router(product_tracker.router)
 
 scheduler = AsyncIOScheduler()
 
@@ -44,12 +45,22 @@ async def run_watchlist_check():
         logger.error(f"Watchlist check failed: {e}")
 
 
+async def run_product_tracker_check():
+    """Background task to refresh tracked products."""
+    from app.services.product_tracker import product_tracker
+    try:
+        await product_tracker.check_tracked_products()
+    except Exception as e:
+        logger.error(f"Product tracker check failed: {e}")
+
+
 @app.on_event("startup")
 async def startup():
     await init_db()
     scheduler.add_job(run_watchlist_check, "interval", minutes=30, id="watchlist_monitor")
+    scheduler.add_job(run_product_tracker_check, "interval", minutes=30, id="product_tracker")
     scheduler.start()
-    logger.info("NicheScout started with MongoDB Atlas, AI advisor, and monitoring")
+    logger.info("NicheScout started with MongoDB Atlas, AI advisor, monitoring, and product tracker")
 
 
 @app.on_event("shutdown")

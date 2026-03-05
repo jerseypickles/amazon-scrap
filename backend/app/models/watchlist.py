@@ -41,6 +41,51 @@ def new_notification_doc(id: int, **fields) -> dict:
     }
 
 
+def new_tracked_product_doc(id: int, **fields) -> dict:
+    """Build a tracked product document for ASIN monitoring."""
+    now = datetime.now(timezone.utc)
+    initial_snapshot: list[dict] = []
+    if fields.get("price") is not None or fields.get("bsr") is not None:
+        initial_snapshot.append({
+            "date": now.isoformat(),
+            "price": fields.get("price"),
+            "bsr": fields.get("bsr"),
+            "rating": fields.get("rating"),
+            "reviews_count": fields.get("reviews_count"),
+            "is_best_seller": fields.get("is_best_seller", False),
+            "is_amazon_choice": fields.get("is_amazon_choice", False),
+            "monthly_bought": fields.get("monthly_bought"),
+        })
+    return {
+        "id": id,
+        "asin": fields.get("asin", ""),
+        "title": fields.get("title", ""),
+        "brand": fields.get("brand"),
+        "image_url": fields.get("image_url"),
+        "product_url": fields.get("product_url"),
+        "category": fields.get("category"),
+        "current_price": fields.get("price"),
+        "current_bsr": fields.get("bsr"),
+        "current_bsr_category": fields.get("bsr_category"),
+        "current_rating": fields.get("rating"),
+        "current_reviews": fields.get("reviews_count"),
+        "current_is_best_seller": fields.get("is_best_seller", False),
+        "current_is_amazon_choice": fields.get("is_amazon_choice", False),
+        "current_monthly_bought": fields.get("monthly_bought"),
+        "features": fields.get("features"),
+        "description": fields.get("description"),
+        "snapshots": initial_snapshot,
+        "check_interval_hours": fields.get("check_interval_hours", 24),
+        "is_active": True,
+        "is_paused": False,
+        "notes": fields.get("notes"),
+        "from_keyword": fields.get("from_keyword"),
+        "from_analysis_id": fields.get("from_analysis_id"),
+        "last_checked_at": now,
+        "created_at": now,
+    }
+
+
 def new_ai_insight_doc(id: int, **fields) -> dict:
     return {
         "id": id,

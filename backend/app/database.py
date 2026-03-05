@@ -23,10 +23,12 @@ async def init_db():
     await db.notifications.create_index("created_at")
     await db.notifications.create_index("is_read")
     await db.ai_insights.create_index("analysis_id")
+    await db.tracked_products.create_index("asin", unique=True)
+    await db.tracked_products.create_index("is_active")
 
     # Counter collection for auto-increment IDs
     if await db.counters.count_documents({}) == 0:
-        for name in ["products", "niche_analyses", "watchlist_items", "notifications", "ai_insights"]:
+        for name in ["products", "niche_analyses", "watchlist_items", "notifications", "ai_insights", "tracked_products"]:
             await db.counters.update_one(
                 {"_id": name}, {"$setOnInsert": {"seq": 0}}, upsert=True,
             )
