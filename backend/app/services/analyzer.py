@@ -56,7 +56,7 @@ class NicheAnalyzer:
             logger.info("Force re-scrape requested for '%s'", keyword)
 
         # 1. Scrape products
-        raw_products = await scraper.search_products_multi_page(keyword, pages)
+        raw_products, search_result_count = await scraper.search_products_multi_page(keyword, pages)
 
         if not raw_products:
             raise ValueError(f"No products found for keyword: {keyword}")
@@ -193,6 +193,7 @@ class NicheAnalyzer:
             median_reviews=median_reviews_val,
             prime_percentage=prime_pct,
             monthly_bought_percentage=bought_pct,
+            search_result_count=search_result_count or None,
             demand_breakdown=demand_bd,
             competition_breakdown=competition_bd,
             price_breakdown=price_bd,
@@ -966,6 +967,7 @@ class NicheAnalyzer:
             median_reviews=a.get("median_reviews"),
             prime_percentage=a.get("prime_percentage"),
             monthly_bought_percentage=a.get("monthly_bought_percentage"),
+            search_result_count=a.get("search_result_count"),
             demand_breakdown=a.get("demand_breakdown") or [],
             competition_breakdown=a.get("competition_breakdown") or [],
             price_breakdown=a.get("price_breakdown") or [],

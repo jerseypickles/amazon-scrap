@@ -53,6 +53,7 @@ class NicheAnalysisResponse(BaseModel):
     median_reviews: float | None = None
     prime_percentage: float | None = None
     monthly_bought_percentage: float | None = None
+    search_result_count: int | None = None
     # Score breakdowns (each signal that composes the score)
     demand_breakdown: list[dict] = []
     competition_breakdown: list[dict] = []

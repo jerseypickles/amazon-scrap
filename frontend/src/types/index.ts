@@ -94,6 +94,7 @@ export interface NicheAnalysis {
   median_reviews: number | null;
   prime_percentage: number | null;
   monthly_bought_percentage: number | null;
+  search_result_count: number | null;
   demand_breakdown: ScoreBreakdown[];
   competition_breakdown: ScoreBreakdown[];
   price_breakdown: ScoreBreakdown[];

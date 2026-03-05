@@ -40,7 +40,7 @@ class AmazonScraper:
 
     # ── Structured API methods (primary when API key exists) ──────────
 
-    async def _structured_search(self, keyword: str, page: int = 1) -> list[dict]:
+    async def _structured_search(self, keyword: str, page: int = 1) -> tuple[list[dict], int]:
         """Use ScraperAPI structured Amazon search endpoint."""
         url = (
             f"{SCRAPER_API_BASE}/structured/amazon/search"
@@ -57,11 +57,16 @@ class AmazonScraper:
                         "Structured search got status %d for '%s' page %d",
                         resp.status_code, keyword, page,
                     )
-                    return []
+                    return [], 0
                 data = resp.json()
             except (httpx.HTTPError, ValueError) as e:
                 logger.error("Structured search error for '%s': %s", keyword, e)
-                return []
+                return [], 0
+
+        # Total results count (Amazon's estimate of matching products)
+        total_results = data.get("total_results") or data.get("totalResults") or 0
+        if isinstance(total_results, str):
+            total_results = int(total_results.replace(",", "").replace(".", "")) if total_results.strip() else 0
 
         results = data.get("results", [])
         products = []
@@ -75,10 +80,10 @@ class AmazonScraper:
                 continue
 
         logger.info(
-            "Structured search: '%s' page %d → %d products",
-            keyword, page, len(products),
+            "Structured search: '%s' page %d → %d products (total_results=%s)",
+            keyword, page, len(products), total_results,
         )
-        return products
+        return products, int(total_results) if total_results else 0
 
     def _parse_structured_item(self, item: dict, keyword: str) -> dict | None:
         asin = item.get("asin", "")
@@ -429,22 +434,27 @@ class AmazonScraper:
 
     # ── Public API (auto-selects structured vs HTML) ──────────────────
 
-    async def search_products(self, keyword: str, page: int = 1) -> list[dict]:
+    async def search_products(self, keyword: str, page: int = 1) -> tuple[list[dict], int]:
+        """Return (products, total_results_count)."""
         if self.use_api:
-            products = await self._structured_search(keyword, page)
+            products, total_results = await self._structured_search(keyword, page)
             if products:
-                return products
+                return products, total_results
             logger.info("Structured search empty, falling back to HTML scrape for '%s'", keyword)
-        return await self._html_search(keyword, page)
+        return await self._html_search(keyword, page), 0
 
-    async def search_products_multi_page(self, keyword: str, pages: int = 2) -> list[dict]:
+    async def search_products_multi_page(self, keyword: str, pages: int = 2) -> tuple[list[dict], int]:
+        """Return (all_products, total_results_count)."""
         all_products = []
+        total_results = 0
         for page in range(1, pages + 1):
-            products = await self.search_products(keyword, page)
+            products, page_total = await self.search_products(keyword, page)
             all_products.extend(products)
+            if page == 1:
+                total_results = page_total
             if page < pages:
                 await asyncio.sleep(random.uniform(1.0, 3.0))
-        return all_products
+        return all_products, total_results
 
     async def get_product_detail(self, asin: str) -> dict | None:
         if self.use_api:

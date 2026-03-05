@@ -265,7 +265,7 @@ class ProductTracker:
         detail = await scraper.get_product_detail(asin)
 
         # Also search for it to get price/rating/reviews/badges
-        search_data = await scraper.search_products(asin, page=1)
+        search_data, _ = await scraper.search_products(asin, page=1)
         search_match = next((p for p in search_data if p.get("asin") == asin), None)
 
         # Merge data — prefer detail page data, search as fallback

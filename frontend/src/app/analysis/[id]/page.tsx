@@ -25,11 +25,6 @@ interface ChatMessage {
   content: string;
 }
 
-function formatBudget(n: number) {
-  return n.toLocaleString("en-US");
-}
-
-const BUDGET_PRESETS = [5000, 10000, 15000, 20000, 30000, 50000];
 
 function scoreColor(s: number | null) {
   if (s === null) return "var(--text-muted)";
@@ -256,9 +251,6 @@ export default function AnalysisDetailPage() {
   const [aiError, setAiError] = useState("");
   const [aiCached, setAiCached] = useState(false);
 
-  // Budget
-  const [budget, setBudget] = useState(10000);
-
   // Chat
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -346,7 +338,7 @@ export default function AnalysisDetailPage() {
     setAiCached(false);
     setChatMessages([]);
     try {
-      const res = await getAIAnalysis(analysis.id, budget);
+      const res = await getAIAnalysis(analysis.id);
       setAiInsight(res.insight);
       setAiCached(res.cached ?? false);
     } catch (err) {
@@ -433,7 +425,7 @@ export default function AnalysisDetailPage() {
     setChatMessages(newMessages);
     setChatLoading(true);
     try {
-      const res = await aiChat(analysis.id, msg, newMessages.slice(0, -1), budget);
+      const res = await aiChat(analysis.id, msg, newMessages.slice(0, -1));
       setChatMessages([...newMessages, { role: "assistant", content: res.reply }]);
     } catch {
       setChatMessages([...newMessages, { role: "assistant", content: "Error al procesar tu mensaje. Intenta de nuevo." }]);
@@ -482,6 +474,7 @@ export default function AnalysisDetailPage() {
                 <span style={{ color: "#a855f7" }}>De &ldquo;{analysis.parent_keyword}&rdquo; &middot; </span>
               )}
               {analysis.total_products} productos &middot; {analysis.brand_count} marcas
+              {analysis.search_result_count ? ` \u00b7 ${analysis.search_result_count.toLocaleString()} resultados en Amazon` : ""}
             </p>
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
               {analysis.created_at ? new Date(analysis.created_at).toLocaleString("es") : ""}
@@ -502,6 +495,20 @@ export default function AnalysisDetailPage() {
               </div>
             ))}
           </div>
+          {analysis.search_result_count != null && analysis.search_result_count > 0 && (
+            <div className="p-3 rounded-xl mb-4" style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)" }}>
+              <div className="flex items-center gap-2">
+                <Search size={14} color="#6366f1" />
+                <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Resultados en Amazon</p>
+              </div>
+              <p className="text-lg font-black mt-1" style={{ color: "#6366f1" }}>
+                {analysis.search_result_count.toLocaleString()}
+              </p>
+              <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                productos compiten por &ldquo;{analysis.keyword}&rdquo;
+              </p>
+            </div>
+          )}
 
           {/* Action buttons */}
           <div className="flex flex-wrap gap-2">
@@ -531,46 +538,6 @@ export default function AnalysisDetailPage() {
             loading={rescraping}
           />
         </div>
-      </div>
-
-      {/* Budget Selector */}
-      <div className="card mb-6">
-        <div className="flex items-center gap-3 mb-3">
-          <DollarSign size={16} color="#10b981" />
-          <h3 className="text-sm font-bold">Presupuesto de Inversi&oacute;n</h3>
-          <span className="text-lg font-black" style={{ color: "#10b981" }}>
-            ${formatBudget(budget)}
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {BUDGET_PRESETS.map((b) => (
-            <button
-              key={b}
-              onClick={() => setBudget(b)}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
-              style={{
-                background: budget === b ? "rgba(16,185,129,0.15)" : "var(--bg-elevated)",
-                color: budget === b ? "#10b981" : "var(--text-secondary)",
-                border: `1px solid ${budget === b ? "rgba(16,185,129,0.3)" : "transparent"}`,
-              }}
-            >
-              ${formatBudget(b)}
-            </button>
-          ))}
-          <input
-            type="number"
-            value={budget}
-            onChange={(e) => setBudget(Math.max(1000, parseInt(e.target.value) || 1000))}
-            className="w-28 px-3 py-1.5 rounded-lg text-xs font-bold"
-            style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", color: "var(--text-primary)" }}
-            min={1000}
-            step={1000}
-            placeholder="Custom..."
-          />
-        </div>
-        <p className="text-[10px] mt-2" style={{ color: "var(--text-muted)" }}>
-          Haz clic en &ldquo;Refrescar IA&rdquo; para re-analizar con este presupuesto. El chat siempre usa el presupuesto actual.
-        </p>
       </div>
 
       {/* AI Analysis Section */}
@@ -670,42 +637,6 @@ export default function AnalysisDetailPage() {
               </div>
             );
           })()}
-
-          {/* Financials Summary */}
-          {aiInsight.financials && (
-            <div className="card">
-              <div className="flex items-center gap-2 mb-3">
-                <DollarSign size={16} color="#10b981" />
-                <h4 className="text-sm font-bold">Análisis Financiero</h4>
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(16,185,129,0.1)", color: "#10b981" }}>${formatBudget(budget)}</span>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                {[
-                  { label: "Costo China", value: aiInsight.financials.costo_unitario_china, color: "#f59e0b" },
-                  { label: "Precio Venta", value: aiInsight.financials.precio_venta_sugerido, color: "#10b981" },
-                  { label: "Margen", value: `${aiInsight.financials.margen_neto_unidad} (${aiInsight.financials.margen_porcentaje})`, color: "#10b981" },
-                  { label: "ROI 12M", value: aiInsight.financials.roi_12_meses, color: "var(--accent)" },
-                ].map((m) => (
-                  <div key={m.label} className="p-2.5 rounded-xl" style={{ background: "var(--bg-elevated)" }}>
-                    <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>{m.label}</p>
-                    <p className="text-sm font-bold mt-0.5" style={{ color: m.color }}>{m.value}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { label: `Unidades con $${formatBudget(budget)}`, value: aiInsight.financials.unidades_con_10k },
-                  { label: "Break-even", value: aiInsight.financials.breakeven_unidades, color: "#f59e0b" },
-                  { label: "LTV/Año", value: aiInsight.financials.ltv_cliente_anual, color: "#10b981" },
-                ].map((m) => (
-                  <div key={m.label} className="p-2.5 rounded-xl text-center" style={{ background: "var(--bg-elevated)" }}>
-                    <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>{m.label}</p>
-                    <p className="text-sm font-bold mt-0.5" style={{ color: m.color }}>{m.value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Minimum Viable Volume + FBA Evaluation */}
           {(aiInsight.min_viable_volume || aiInsight.fba_evaluation) && (
@@ -1092,7 +1023,7 @@ export default function AnalysisDetailPage() {
             <div className="flex-1">
               <h3 className="text-sm font-bold">AI Brain Chat</h3>
               <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-                Pregunta lo que quieras sobre {analysis.keyword} &middot; ${formatBudget(budget)}
+                Pregunta lo que quieras sobre {analysis.keyword}
               </p>
             </div>
           </div>

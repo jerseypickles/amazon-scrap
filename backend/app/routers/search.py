@@ -16,7 +16,7 @@ async def search_products(
     q: str = Query(..., min_length=1, description="Search keyword"),
     page: int = Query(1, ge=1, le=10),
 ):
-    products = await scraper.search_products(q, page)
+    products, total_results = await scraper.search_products(q, page)
 
     if not products:
         raise HTTPException(status_code=404, detail="No products found")
@@ -32,7 +32,7 @@ async def search_products(
     return {
         "keyword": q,
         "page": page,
-        "total_results": len(products),
+        "total_results": total_results or len(products),
         "products": products,
     }
 
