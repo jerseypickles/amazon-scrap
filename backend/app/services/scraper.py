@@ -127,7 +127,11 @@ class AmazonScraper:
         }
 
     async def _structured_product_detail(self, asin: str) -> dict | None:
-        """Use ScraperAPI structured Amazon product endpoint."""
+        """Use ScraperAPI structured Amazon product endpoint.
+
+        Extracts comprehensive product data: BSR, pricing, ratings,
+        seller info, product specs, availability, and more.
+        """
         url = (
             f"{SCRAPER_API_BASE}/structured/amazon/product"
             f"?api_key={self.api_key}"
@@ -156,25 +160,151 @@ class AmazonScraper:
         elif data.get("product_category"):
             bsr_category = data["product_category"]
 
-        # Features
+        # Features / bullet points
         features = None
+        feature_bullets: list[str] = []
         feat_list = data.get("feature_bullets", [])
         if isinstance(feat_list, list) and feat_list:
-            features = " | ".join(str(f) for f in feat_list[:5])
+            feature_bullets = [str(f) for f in feat_list[:10]]
+            features = " | ".join(feature_bullets[:5])
 
         # Description
         description = data.get("product_description") or data.get("description") or None
 
-        # Sold by
-        sold_by = data.get("sold_by") or None
+        # Title from product page
+        title = data.get("name") or None
+
+        # Brand
+        brand = data.get("brand") or None
+
+        # Price — parse from string like "$29.95"
+        price = None
+        pricing_str = data.get("pricing")
+        if isinstance(pricing_str, str):
+            price_match = re.search(r"\$?([\d,]+\.?\d*)", pricing_str)
+            if price_match:
+                try:
+                    price = float(price_match.group(1).replace(",", ""))
+                except ValueError:
+                    pass
+
+        # Rating & reviews from product page
+        rating = None
+        if data.get("average_rating"):
+            try:
+                rating = float(data["average_rating"])
+            except (ValueError, TypeError):
+                pass
+
+        total_ratings = None
+        if data.get("total_ratings"):
+            try:
+                total_ratings = int(data["total_ratings"])
+            except (ValueError, TypeError):
+                pass
+
+        total_reviews = None
+        if data.get("total_reviews"):
+            try:
+                total_reviews = int(data["total_reviews"])
+            except (ValueError, TypeError):
+                pass
+
+        # Rating breakdown (1-5 stars percentages)
+        rating_breakdown = {}
+        for stars in range(1, 6):
+            key = f"{stars}_star_percentage"
+            if data.get(key) is not None:
+                try:
+                    rating_breakdown[f"{stars}_star"] = float(str(data[key]).replace("%", ""))
+                except (ValueError, TypeError):
+                    pass
+
+        # Seller info
+        seller_name = data.get("seller_name") or data.get("sold_by") or None
+        seller_id = data.get("seller_id") or None
+
+        # Availability
+        availability = data.get("availability_status") or None
+
+        # Shipping
+        shipping_price = data.get("shipping_price") or None
+        shipping_condition = data.get("shipping_condition") or None
+
+        # Coupon & A+ content
+        has_coupon = bool(data.get("is_coupon_exists"))
+        has_aplus = bool(data.get("aplus_present"))
+
+        # Product information (dimensions, weight, manufacturer, etc.)
+        product_info = data.get("product_information", {})
+        dimensions = product_info.get("product_dimensions") if isinstance(product_info, dict) else None
+        weight = product_info.get("item_weight") if isinstance(product_info, dict) else None
+        manufacturer = product_info.get("manufacturer") if isinstance(product_info, dict) else None
+        date_first_available = product_info.get("date_first_available") if isinstance(product_info, dict) else None
+        model_number = product_info.get("item_model_number") if isinstance(product_info, dict) else None
+
+        # Images
+        images: list[str] = []
+        hi_res = data.get("high_res_images")
+        if isinstance(hi_res, list):
+            images = [img for img in hi_res if isinstance(img, str)][:8]
+        if not images:
+            img_list = data.get("images")
+            if isinstance(img_list, list):
+                images = [img for img in img_list if isinstance(img, str)][:8]
+
+        # Variations / customization options
+        variations: list[dict] = []
+        customs = data.get("customization_options")
+        if isinstance(customs, dict):
+            for option_name, option_values in customs.items():
+                if isinstance(option_values, list):
+                    variations.append({"name": option_name, "values": option_values[:20]})
+
+        # Top reviews from product page
+        top_reviews: list[dict] = []
+        reviews_raw = data.get("reviews")
+        if isinstance(reviews_raw, list):
+            for rev in reviews_raw[:5]:
+                if isinstance(rev, dict):
+                    top_reviews.append({
+                        "stars": rev.get("stars"),
+                        "title": rev.get("title"),
+                        "text": (rev.get("review") or "")[:500],
+                        "date": rev.get("date"),
+                        "verified": rev.get("verified_purchase", False),
+                        "author": rev.get("username"),
+                    })
 
         return {
             "asin": asin,
+            "title": title,
+            "brand": brand,
+            "price": price,
+            "rating": rating,
+            "total_ratings": total_ratings,
+            "total_reviews": total_reviews,
             "bsr": bsr,
             "bsr_category": bsr_category,
             "description": description,
             "features": features,
-            "sold_by": sold_by,
+            "feature_bullets": feature_bullets,
+            "seller_name": seller_name,
+            "seller_id": seller_id,
+            "availability": availability,
+            "shipping_price": shipping_price,
+            "shipping_condition": shipping_condition,
+            "has_coupon": has_coupon,
+            "has_aplus": has_aplus,
+            "rating_breakdown": rating_breakdown or None,
+            "dimensions": dimensions,
+            "weight": weight,
+            "manufacturer": manufacturer,
+            "date_first_available": date_first_available,
+            "model_number": model_number,
+            "images": images or None,
+            "variations": variations or None,
+            "top_reviews": top_reviews or None,
         }
 
     # ── Public API (auto-selects structured vs HTML) ──────────────────

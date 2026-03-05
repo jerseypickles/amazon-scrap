@@ -358,6 +358,20 @@ export interface ProductSnapshot {
   monthly_bought: string | null;
 }
 
+export interface ProductReview {
+  stars: number | null;
+  title: string | null;
+  text: string | null;
+  date: string | null;
+  verified: boolean;
+  author: string | null;
+}
+
+export interface ProductVariation {
+  name: string;
+  values: string[];
+}
+
 export interface TrackedProduct {
   id: number;
   asin: string;
@@ -375,7 +389,26 @@ export interface TrackedProduct {
   current_is_amazon_choice: boolean;
   current_monthly_bought: string | null;
   features: string | null;
+  feature_bullets: string[] | null;
   description: string | null;
+  // Extended product data
+  seller_name: string | null;
+  seller_id: string | null;
+  availability: string | null;
+  has_coupon: boolean;
+  has_aplus: boolean;
+  rating_breakdown: Record<string, number> | null;
+  dimensions: string | null;
+  weight: string | null;
+  manufacturer: string | null;
+  date_first_available: string | null;
+  model_number: string | null;
+  images: string[] | null;
+  variations: ProductVariation[] | null;
+  top_reviews: ProductReview[] | null;
+  total_ratings: number | null;
+  shipping_info: string | null;
+  // Tracking
   snapshots: ProductSnapshot[];
   check_interval_hours: number;
   is_active: boolean;

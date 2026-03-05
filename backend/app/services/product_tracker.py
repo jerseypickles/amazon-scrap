@@ -59,17 +59,35 @@ class ProductTracker:
         if count >= MAX_TRACKED:
             raise ValueError(f"Maximum {MAX_TRACKED} tracked products reached. Remove some before adding new ones.")
 
-        # If we don't have detail data, scrape it
-        if bsr is None and scraper.use_api:
+        # Always try to fetch full product detail for rich data
+        detail_data: dict = {}
+        if scraper.use_api:
             try:
                 detail = await scraper.get_product_detail(asin)
                 if detail:
-                    bsr = detail.get("bsr")
-                    bsr_category = detail.get("bsr_category")
+                    detail_data = detail
+                    if bsr is None:
+                        bsr = detail.get("bsr")
+                    if not bsr_category:
+                        bsr_category = detail.get("bsr_category")
                     if not title:
                         title = detail.get("title") or title
+                    if not brand:
+                        brand = detail.get("brand") or brand
+                    if price is None and detail.get("price"):
+                        price = detail["price"]
+                    if rating is None and detail.get("rating"):
+                        rating = detail["rating"]
+                    if reviews_count is None and detail.get("total_reviews"):
+                        reviews_count = detail["total_reviews"]
             except Exception as e:
                 logger.warning("Could not fetch detail for %s: %s", asin, e)
+
+        # Build shipping info string
+        shipping_info = None
+        if detail_data.get("shipping_price") or detail_data.get("shipping_condition"):
+            parts = [p for p in [detail_data.get("shipping_price"), detail_data.get("shipping_condition")] if p]
+            shipping_info = " - ".join(parts) if parts else None
 
         pid = await _database.get_next_id("tracked_products")
         doc = new_tracked_product_doc(
@@ -91,6 +109,24 @@ class ProductTracker:
             from_analysis_id=from_analysis_id,
             notes=notes,
             check_interval_hours=interval_hours,
+            # Extended data from product detail
+            feature_bullets=detail_data.get("feature_bullets"),
+            seller_name=detail_data.get("seller_name"),
+            seller_id=detail_data.get("seller_id"),
+            availability=detail_data.get("availability"),
+            has_coupon=detail_data.get("has_coupon", False),
+            has_aplus=detail_data.get("has_aplus", False),
+            rating_breakdown=detail_data.get("rating_breakdown"),
+            dimensions=detail_data.get("dimensions"),
+            weight=detail_data.get("weight"),
+            manufacturer=detail_data.get("manufacturer"),
+            date_first_available=detail_data.get("date_first_available"),
+            model_number=detail_data.get("model_number"),
+            images=detail_data.get("images"),
+            variations=detail_data.get("variations"),
+            top_reviews=detail_data.get("top_reviews"),
+            total_ratings=detail_data.get("total_ratings"),
+            shipping_info=shipping_info,
         )
         await _database.db.tracked_products.insert_one(doc)
 
@@ -195,14 +231,14 @@ class ProductTracker:
         asin = item["asin"]
         now = datetime.now(timezone.utc)
 
-        # Scrape product detail (BSR, features, description)
+        # Scrape product detail (BSR, features, description, + extended data)
         detail = await scraper.get_product_detail(asin)
 
         # Also search for it to get price/rating/reviews/badges
         search_data = await scraper.search_products(asin, page=1)
         search_match = next((p for p in search_data if p.get("asin") == asin), None)
 
-        # Merge data
+        # Merge data — prefer detail page data, search as fallback
         new_price = None
         new_rating = None
         new_reviews = None
@@ -230,6 +266,13 @@ class ProductTracker:
                 new_features = detail["features"]
             if detail.get("description"):
                 new_description = detail["description"]
+            # Prefer product page price/rating/reviews if search didn't find them
+            if new_price is None and detail.get("price"):
+                new_price = detail["price"]
+            if new_rating is None and detail.get("rating"):
+                new_rating = detail["rating"]
+            if new_reviews is None and detail.get("total_reviews"):
+                new_reviews = detail["total_reviews"]
 
         # Build snapshot
         snapshot = {
@@ -246,7 +289,7 @@ class ProductTracker:
         # Detect changes and create notifications
         await self._detect_changes(item, snapshot)
 
-        # Update document
+        # Update document — core tracking fields
         update_set: dict = {
             "last_checked_at": now,
         }
@@ -267,6 +310,47 @@ class ProductTracker:
             update_set["features"] = new_features
         if new_description:
             update_set["description"] = new_description
+
+        # Update extended data from product detail
+        if detail:
+            if detail.get("feature_bullets"):
+                update_set["feature_bullets"] = detail["feature_bullets"]
+            if detail.get("seller_name"):
+                update_set["seller_name"] = detail["seller_name"]
+            if detail.get("seller_id"):
+                update_set["seller_id"] = detail["seller_id"]
+            if detail.get("availability"):
+                update_set["availability"] = detail["availability"]
+            update_set["has_coupon"] = detail.get("has_coupon", False)
+            update_set["has_aplus"] = detail.get("has_aplus", False)
+            if detail.get("rating_breakdown"):
+                update_set["rating_breakdown"] = detail["rating_breakdown"]
+            if detail.get("dimensions"):
+                update_set["dimensions"] = detail["dimensions"]
+            if detail.get("weight"):
+                update_set["weight"] = detail["weight"]
+            if detail.get("manufacturer"):
+                update_set["manufacturer"] = detail["manufacturer"]
+            if detail.get("date_first_available"):
+                update_set["date_first_available"] = detail["date_first_available"]
+            if detail.get("model_number"):
+                update_set["model_number"] = detail["model_number"]
+            if detail.get("images"):
+                update_set["images"] = detail["images"]
+            if detail.get("variations"):
+                update_set["variations"] = detail["variations"]
+            if detail.get("top_reviews"):
+                update_set["top_reviews"] = detail["top_reviews"]
+            if detail.get("total_ratings"):
+                update_set["total_ratings"] = detail["total_ratings"]
+            if detail.get("title") and not item.get("title"):
+                update_set["title"] = detail["title"]
+            if detail.get("brand") and not item.get("brand"):
+                update_set["brand"] = detail["brand"]
+            # Shipping info
+            parts = [p for p in [detail.get("shipping_price"), detail.get("shipping_condition")] if p]
+            if parts:
+                update_set["shipping_info"] = " - ".join(parts)
 
         await _database.db.tracked_products.update_one(
             {"_id": item["_id"]},

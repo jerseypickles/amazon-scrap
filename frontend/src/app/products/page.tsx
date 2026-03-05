@@ -6,7 +6,9 @@ import {
   Package, RefreshCw, Trash2, Pause, Play, ExternalLink,
   TrendingUp, TrendingDown, DollarSign, BarChart3, Award,
   BadgeCheck, Star, Flame, Loader2, Search, Plus, Minus,
-  AlertTriangle, Hash,
+  AlertTriangle, Hash, ShieldCheck, Truck, Tag, Info,
+  Box, Weight, Factory, Calendar, User, MessageSquare,
+  CheckCircle2, Image as ImageIcon, Layers,
 } from "lucide-react";
 import {
   getTrackedProducts, getTrackedProductStats, refreshTrackedProduct,
@@ -96,9 +98,22 @@ function MiniChart({ data, field, color, height = 32 }: { data: ProductSnapshot[
 
 /* ── Detail Panel ──────────────────────────────────────── */
 
+function RatingBar({ label, pct, color }: { label: string; pct: number; color: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[10px] w-10 text-right" style={{ color: "var(--text-muted)" }}>{label}</span>
+      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+      </div>
+      <span className="text-[10px] w-8" style={{ color: "var(--text-secondary)" }}>{pct}%</span>
+    </div>
+  );
+}
+
 function DetailPanel({ product, onClose }: { product: TrackedProduct; onClose: () => void }) {
   const s = product.snapshots;
-  const features = product.features?.split(" | ") || [];
+  const bullets = product.feature_bullets || (product.features?.split(" | ") || []);
+  const rb = product.rating_breakdown;
 
   return (
     <div
@@ -107,7 +122,7 @@ function DetailPanel({ product, onClose }: { product: TrackedProduct; onClose: (
     >
       <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }} />
       <div
-        className="relative w-full max-w-lg overflow-y-auto"
+        className="relative w-full max-w-2xl overflow-y-auto"
         style={{ background: "var(--bg-card)", borderLeft: "1px solid var(--border)" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -125,13 +140,26 @@ function DetailPanel({ product, onClose }: { product: TrackedProduct; onClose: (
               <p className="text-sm font-bold leading-snug">{product.title}</p>
               <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>
                 ASIN: {product.asin} {product.brand && `| ${product.brand}`}
+                {product.manufacturer && product.manufacturer !== product.brand && ` | Fab: ${product.manufacturer}`}
               </p>
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
                 {product.current_is_best_seller && (
                   <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{ background: "rgba(249,115,22,0.12)", color: "#f97316" }}>BEST SELLER</span>
                 )}
                 {product.current_is_amazon_choice && (
                   <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{ background: "rgba(16,185,129,0.12)", color: "#10b981" }}>CHOICE</span>
+                )}
+                {product.has_coupon && (
+                  <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{ background: "rgba(239,68,68,0.12)", color: "#ef4444" }}>COUPON</span>
+                )}
+                {product.has_aplus && (
+                  <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{ background: "rgba(168,85,247,0.12)", color: "#a855f7" }}>A+ CONTENT</span>
+                )}
+                {product.availability && (
+                  <span className="text-[8px] font-bold px-1.5 py-0.5 rounded" style={{
+                    background: product.availability.toLowerCase().includes("in stock") ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)",
+                    color: product.availability.toLowerCase().includes("in stock") ? "#10b981" : "#ef4444",
+                  }}>{product.availability}</span>
                 )}
               </div>
             </div>
@@ -153,7 +181,9 @@ function DetailPanel({ product, onClose }: { product: TrackedProduct; onClose: (
             <div className="card text-center">
               <Star size={14} color="#f59e0b" className="mx-auto mb-1" />
               <p className="text-lg font-black" style={{ color: "#f59e0b" }}>{product.current_rating?.toFixed(1) || "--"}</p>
-              <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>Rating</p>
+              <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                Rating {product.total_ratings ? `(${product.total_ratings.toLocaleString()} votos)` : ""}
+              </p>
             </div>
             <div className="card text-center">
               <BarChart3 size={14} color="#ec4899" className="mx-auto mb-1" />
@@ -162,9 +192,23 @@ function DetailPanel({ product, onClose }: { product: TrackedProduct; onClose: (
             </div>
           </div>
 
+          {/* Rating Breakdown */}
+          {rb && Object.keys(rb).length > 0 && (
+            <div className="card mb-4">
+              <p className="text-xs font-bold mb-3 flex items-center gap-1.5"><Star size={12} color="#f59e0b" /> Rating Breakdown</p>
+              <div className="space-y-1.5">
+                {[5, 4, 3, 2, 1].map((stars) => {
+                  const key = `${stars}_star`;
+                  const pct = rb[key] ?? 0;
+                  return <RatingBar key={stars} label={`${stars}★`} pct={pct} color={stars >= 4 ? "#f59e0b" : stars === 3 ? "#eab308" : "#ef4444"} />;
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Charts */}
           {s.length >= 2 && (
-            <div className="space-y-4 mb-6">
+            <div className="grid grid-cols-2 gap-3 mb-6">
               <div className="card">
                 <p className="text-xs font-bold mb-2">Precio</p>
                 <MiniChart data={s} field="price" color="#10b981" height={50} />
@@ -184,14 +228,103 @@ function DetailPanel({ product, onClose }: { product: TrackedProduct; onClose: (
             </div>
           )}
 
+          {/* Product Images Gallery */}
+          {product.images && product.images.length > 1 && (
+            <div className="card mb-4">
+              <p className="text-xs font-bold mb-2 flex items-center gap-1.5"><ImageIcon size={12} color="#8b5cf6" /> Imagenes ({product.images.length})</p>
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {product.images.map((img, i) => (
+                  <img key={i} src={img} alt="" className="w-16 h-16 rounded-lg object-contain flex-shrink-0" style={{ background: "rgba(255,255,255,0.06)" }} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Product Info Grid */}
+          {(product.seller_name || product.dimensions || product.weight || product.date_first_available || product.model_number || product.shipping_info) && (
+            <div className="card mb-4">
+              <p className="text-xs font-bold mb-3 flex items-center gap-1.5"><Info size={12} color="#6366f1" /> Informacion del Producto</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                {product.seller_name && (
+                  <div className="flex items-center gap-1.5">
+                    <User size={10} style={{ color: "var(--text-muted)" }} />
+                    <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>Vendedor:</span>
+                    <span className="text-[10px] font-bold">{product.seller_name}</span>
+                  </div>
+                )}
+                {product.manufacturer && (
+                  <div className="flex items-center gap-1.5">
+                    <Factory size={10} style={{ color: "var(--text-muted)" }} />
+                    <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>Fabricante:</span>
+                    <span className="text-[10px] font-bold">{product.manufacturer}</span>
+                  </div>
+                )}
+                {product.dimensions && (
+                  <div className="flex items-center gap-1.5">
+                    <Box size={10} style={{ color: "var(--text-muted)" }} />
+                    <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>Dimensiones:</span>
+                    <span className="text-[10px] font-bold">{product.dimensions}</span>
+                  </div>
+                )}
+                {product.weight && (
+                  <div className="flex items-center gap-1.5">
+                    <Weight size={10} style={{ color: "var(--text-muted)" }} />
+                    <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>Peso:</span>
+                    <span className="text-[10px] font-bold">{product.weight}</span>
+                  </div>
+                )}
+                {product.model_number && (
+                  <div className="flex items-center gap-1.5">
+                    <Tag size={10} style={{ color: "var(--text-muted)" }} />
+                    <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>Modelo:</span>
+                    <span className="text-[10px] font-bold">{product.model_number}</span>
+                  </div>
+                )}
+                {product.date_first_available && (
+                  <div className="flex items-center gap-1.5">
+                    <Calendar size={10} style={{ color: "var(--text-muted)" }} />
+                    <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>Disponible:</span>
+                    <span className="text-[10px] font-bold">{product.date_first_available}</span>
+                  </div>
+                )}
+                {product.shipping_info && (
+                  <div className="flex items-center gap-1.5 col-span-2">
+                    <Truck size={10} style={{ color: "var(--text-muted)" }} />
+                    <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>Envio:</span>
+                    <span className="text-[10px] font-bold">{product.shipping_info}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Variations */}
+          {product.variations && product.variations.length > 0 && (
+            <div className="card mb-4">
+              <p className="text-xs font-bold mb-2 flex items-center gap-1.5"><Layers size={12} color="#ec4899" /> Variaciones</p>
+              {product.variations.map((v, i) => (
+                <div key={i} className="mb-2">
+                  <p className="text-[10px] font-bold mb-1" style={{ color: "var(--text-secondary)" }}>{v.name}</p>
+                  <div className="flex flex-wrap gap-1">
+                    {v.values.map((val, j) => (
+                      <span key={j} className="text-[9px] px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.06)", color: "var(--text-secondary)" }}>
+                        {val}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Features (Bullet Points) */}
-          {features.length > 0 && (
-            <div className="card mb-6">
-              <p className="text-xs font-bold mb-2">Bullet Points</p>
+          {bullets.length > 0 && (
+            <div className="card mb-4">
+              <p className="text-xs font-bold mb-2 flex items-center gap-1.5"><CheckCircle2 size={12} color="#10b981" /> Bullet Points</p>
               <ul className="space-y-1.5">
-                {features.map((f, i) => (
+                {bullets.map((f, i) => (
                   <li key={i} className="text-[11px] leading-relaxed flex gap-2" style={{ color: "var(--text-secondary)" }}>
-                    <span style={{ color: "var(--accent)" }}>-</span>
+                    <span className="mt-0.5 flex-shrink-0" style={{ color: "#10b981" }}>&#x2022;</span>
                     {f}
                   </li>
                 ))}
@@ -201,17 +334,50 @@ function DetailPanel({ product, onClose }: { product: TrackedProduct; onClose: (
 
           {/* Description */}
           {product.description && (
-            <div className="card mb-6">
+            <div className="card mb-4">
               <p className="text-xs font-bold mb-2">Descripcion</p>
               <p className="text-[11px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                {product.description.slice(0, 500)}{product.description.length > 500 ? "..." : ""}
+                {product.description.slice(0, 800)}{product.description.length > 800 ? "..." : ""}
               </p>
+            </div>
+          )}
+
+          {/* Top Reviews */}
+          {product.top_reviews && product.top_reviews.length > 0 && (
+            <div className="card mb-4">
+              <p className="text-xs font-bold mb-3 flex items-center gap-1.5"><MessageSquare size={12} color="#f59e0b" /> Top Reviews ({product.top_reviews.length})</p>
+              <div className="space-y-3">
+                {product.top_reviews.map((rev, i) => (
+                  <div key={i} className="pb-3" style={{ borderBottom: i < product.top_reviews!.length - 1 ? "1px solid var(--border)" : "none" }}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-0.5">
+                        {Array.from({ length: 5 }, (_, j) => (
+                          <Star key={j} size={8} fill={j < (rev.stars || 0) ? "#f59e0b" : "transparent"} color={j < (rev.stars || 0) ? "#f59e0b" : "var(--text-muted)"} />
+                        ))}
+                      </div>
+                      {rev.title && <span className="text-[10px] font-bold">{rev.title}</span>}
+                    </div>
+                    {rev.text && (
+                      <p className="text-[10px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                        {rev.text.slice(0, 300)}{rev.text.length > 300 ? "..." : ""}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2 mt-1">
+                      {rev.author && <span className="text-[9px]" style={{ color: "var(--text-muted)" }}>{rev.author}</span>}
+                      {rev.date && <span className="text-[9px]" style={{ color: "var(--text-muted)" }}>{rev.date}</span>}
+                      {rev.verified && (
+                        <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: "rgba(16,185,129,0.1)", color: "#10b981" }}>Verificado</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
           {/* Snapshots Table */}
           {s.length > 0 && (
-            <div className="card">
+            <div className="card mb-4">
               <p className="text-xs font-bold mb-2">Historial ({s.length} snapshots)</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-[10px]">
@@ -246,7 +412,7 @@ function DetailPanel({ product, onClose }: { product: TrackedProduct; onClose: (
               href={product.product_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-colors"
+              className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-colors"
               style={{ background: "rgba(249,115,22,0.1)", color: "var(--accent)" }}
             >
               <ExternalLink size={14} /> Ver en Amazon
@@ -521,6 +687,16 @@ export default function ProductTrackerPage() {
                           {p.current_monthly_bought && (
                             <span className="text-[8px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-0.5" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>
                               <Flame size={8} /> {p.current_monthly_bought}
+                            </span>
+                          )}
+                          {p.has_coupon && (
+                            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-0.5" style={{ background: "rgba(239,68,68,0.12)", color: "#ef4444" }}>
+                              <Tag size={8} /> COUPON
+                            </span>
+                          )}
+                          {p.has_aplus && (
+                            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-0.5" style={{ background: "rgba(168,85,247,0.12)", color: "#a855f7" }}>
+                              A+
                             </span>
                           )}
                         </div>

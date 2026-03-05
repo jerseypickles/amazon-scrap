@@ -61,6 +61,20 @@ class ProductSnapshot(BaseModel):
     monthly_bought: str | None = None
 
 
+class ProductReview(BaseModel):
+    stars: float | None = None
+    title: str | None = None
+    text: str | None = None
+    date: str | None = None
+    verified: bool = False
+    author: str | None = None
+
+
+class ProductVariation(BaseModel):
+    name: str
+    values: list[str] = []
+
+
 class TrackedProductResponse(BaseModel):
     id: int
     asin: str
@@ -78,7 +92,26 @@ class TrackedProductResponse(BaseModel):
     current_is_amazon_choice: bool = False
     current_monthly_bought: str | None = None
     features: str | None = None
+    feature_bullets: list[str] | None = None
     description: str | None = None
+    # Extended product data
+    seller_name: str | None = None
+    seller_id: str | None = None
+    availability: str | None = None
+    has_coupon: bool = False
+    has_aplus: bool = False
+    rating_breakdown: dict | None = None
+    dimensions: str | None = None
+    weight: str | None = None
+    manufacturer: str | None = None
+    date_first_available: str | None = None
+    model_number: str | None = None
+    images: list[str] | None = None
+    variations: list[ProductVariation] | None = None
+    top_reviews: list[ProductReview] | None = None
+    total_ratings: int | None = None
+    shipping_info: str | None = None
+    # Tracking
     snapshots: list[ProductSnapshot] = []
     check_interval_hours: int = 24
     is_active: bool = True
