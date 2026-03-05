@@ -17,6 +17,7 @@ import {
   Repeat,
   DollarSign,
   Package,
+  Settings,
 } from "lucide-react";
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from "@/lib/api";
 import type { AppNotification } from "@/types";
@@ -29,6 +30,7 @@ const NAV_ITEMS = [
   { href: "/products", label: "ASIN Tracker", icon: Package },
   { href: "/history", label: "Historial", icon: Clock },
   { href: "/categories", label: "Categorías", icon: FolderTree },
+  { href: "/profile", label: "Perfil", icon: Settings },
 ];
 
 function severityIcon(severity: string) {

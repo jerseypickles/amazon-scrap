@@ -13,6 +13,7 @@ import type {
   SmartNichesResponse,
   TrackedProduct,
   TrackedProductStats,
+  UserProfile,
 } from "@/types";
 
 const API_BASE = "/api";
@@ -255,4 +256,16 @@ export async function togglePauseTracked(productId: number): Promise<TrackedProd
 
 export async function removeTrackedProduct(productId: number): Promise<void> {
   return fetchAPI(`/tracked-products/${productId}`, { method: "DELETE" });
+}
+
+// User Profile
+export async function getUserProfile(): Promise<UserProfile> {
+  return fetchAPI("/profile");
+}
+
+export async function updateUserProfile(profile: Omit<UserProfile, "updated_at">): Promise<UserProfile> {
+  return fetchAPI("/profile", {
+    method: "PUT",
+    body: JSON.stringify(profile),
+  });
 }

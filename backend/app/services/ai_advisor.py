@@ -9,6 +9,7 @@ from app.config import settings
 import app.database as _database
 from app.models.watchlist import new_ai_insight_doc
 from app.services.analyzer import analyzer
+from app.routers.profile import get_user_profile
 
 logger = logging.getLogger(__name__)
 
@@ -123,38 +124,101 @@ PRESUPUESTO DISPONIBLE: ${b:,}
 
         return ctx
 
+    def _build_profile_prompt(self, profile, b: int) -> str:
+        """Build a dynamic prompt section based on user profile settings."""
+        model = profile.business_model
+        product_type = profile.product_type
+        fulfillment = profile.fulfillment
+        experience = profile.experience
+
+        sections = []
+
+        # Business model section
+        if model == "generic_only":
+            sections.append("""MODELO DE NEGOCIO DEL CLIENTE — SOLO GENÉRICO / MARCA CHINA:
+- El cliente SOLO revende productos que el proveedor chino YA tiene con SU propia marca y packaging listo.
+- NO planea crear marca propia. NUNCA sugieras crear marca privada.
+- Ventaja: $0 en branding, packaging listo, entrada inmediata.
+- Riesgo principal: competencia por Buy Box (otros vendedores en el mismo ASIN).
+- Evalúa si el nicho permite reventa genérica exitosa o si REQUIERE marca propia (en cuyo caso es NO-GO para este cliente).
+- Si un nicho NO funciona con genérico, sugiere nichos alternativos que SÍ funcionen con este modelo.""")
+
+        elif model == "brand_only":
+            sections.append("""MODELO DE NEGOCIO DEL CLIENTE — SOLO MARCA PROPIA:
+- El cliente quiere crear su propia marca desde el inicio (trademark USPTO + Brand Registry).
+- Evalúa: costo de branding + packaging personalizado + A+ Content.
+- Ventaja: protección de listing, A+ Content, Brand Store, sin competencia por Buy Box.
+- Mayor inversión inicial pero mayor protección a largo plazo.
+- NO sugieras empezar con marca genérica — el cliente quiere su marca desde el día 1.""")
+
+        else:  # generic_then_brand
+            sections.append("""MODELO DE NEGOCIO DEL CLIENTE — GENÉRICO PRIMERO, LUEGO MARCA PROPIA:
+El cliente tiene un modelo de 2 fases:
+
+FASE 1 - MARCA DEL PROVEEDOR CHINO (entrada rápida):
+- Comprar productos que el proveedor chino YA tiene con SU propia marca y packaging listo.
+- $0 en branding, packaging listo, entrada inmediata.
+- Objetivo: VALIDAR que el nicho tiene demanda real con inversión mínima.
+
+FASE 2 - MARCA PRIVADA (escalar si Fase 1 valida):
+- Solo SI el ASIN de Fase 1 demuestra ventas consistentes, crear marca propia.
+- Registrar trademark en USPTO, Brand Registry, A+ Content.
+
+IMPORTANTE: Hay nichos donde la Fase 1 NO funciona porque los compradores SOLO confían en marcas conocidas. En esos casos, indicar que se necesita marca propia desde el inicio.""")
+
+        # Product type section
+        if product_type == "consumable_only":
+            sections.append("""TIPO DE PRODUCTO — SOLO CONSUMIBLES:
+- El cliente SOLO vende productos consumibles (recompra recurrente).
+- SIEMPRE calcula: frecuencia de recompra, LTV anual, potencial Subscribe & Save.
+- Si un nicho NO es consumible, es NO-GO. Sugiere nichos consumibles alternativos.
+- NUNCA sugieras productos duraderos/no-consumibles.""")
+
+        elif product_type == "non_consumable_only":
+            sections.append("""TIPO DE PRODUCTO — SOLO NO-CONSUMIBLES:
+- El cliente vende productos duraderos, no consumibles.
+- NO evalúes frecuencia de recompra ni LTV de consumibles.
+- Enfócate en: diferenciación, calidad, margen por unidad, competencia de listings.""")
+
+        else:  # any
+            sections.append("""TIPO DE PRODUCTO — CUALQUIER TIPO:
+- El cliente vende tanto consumibles como no-consumibles.
+- Si es consumible: calcula recompra, LTV, Subscribe & Save.
+- Si no es consumible: enfócate en diferenciación y margen unitario.""")
+
+        # Fulfillment
+        if fulfillment == "fba":
+            sections.append("FULFILLMENT: El cliente usa Amazon FBA. Evalúa costos FBA, ventaja Prime, Buy Box.")
+        elif fulfillment == "fbm":
+            sections.append("FULFILLMENT: El cliente usa FBM (envío propio). NO incluyas costos FBA. Evalúa costos de envío propio.")
+        else:
+            sections.append("FULFILLMENT: El cliente usa FBA y FBM según conveniencia. Compara costos de ambos.")
+
+        # Experience level
+        if experience == "beginner":
+            sections.append("EXPERIENCIA: Principiante. Explica conceptos, sé detallado en costos, evita nichos complejos con regulación.")
+        elif experience == "advanced":
+            sections.append("EXPERIENCIA: Avanzado. Sé directo, no expliques conceptos básicos, profundiza en estrategia y números.")
+
+        sections.append(f"Tu cliente tiene ${b:,} USD para invertir.")
+
+        return "\n\n".join(sections)
+
     async def analyze_niche_ai(self, analysis_id: int, budget: int | None = None, db_ref=None) -> dict:
         analysis_resp = await analyzer.get_analysis_by_id(analysis_id)
         if not analysis_resp:
             raise ValueError("Analysis not found")
 
-        b = budget or DEFAULT_BUDGET
+        # Load user profile
+        profile = await get_user_profile()
+        b = budget or profile.budget or DEFAULT_BUDGET
         analysis_data = analysis_resp.model_dump()
         context = self._build_analysis_context(analysis_data, budget=b)
+        profile_prompt = self._build_profile_prompt(profile, b)
 
         prompt = f"""Eres un experto estratega de Amazon FBA, sourcing desde China (Alibaba/1688), y Amazon PPC/Advertising.
 
-MODELO DE NEGOCIO DEL CLIENTE (MUY IMPORTANTE - LEER COMPLETO):
-El cliente tiene un modelo de 2 fases:
-
-FASE 1 - MARCA DEL PROVEEDOR CHINO (entrada rápida):
-- Comprar productos que el proveedor chino YA tiene con SU propia marca y packaging listo.
-- El proveedor ya tiene marca registrada, empaque diseñado, producto terminado.
-- El cliente solo compra y revende en Amazon bajo la marca del proveedor.
-- Ventaja: $0 en branding, packaging listo, entrada inmediata.
-- Riesgo: otros vendedores pueden vender el mismo producto en el mismo ASIN (competencia por Buy Box).
-- Objetivo: VALIDAR que el nicho tiene demanda real con inversión mínima.
-
-FASE 2 - MARCA PRIVADA (escalar si Fase 1 valida):
-- Solo SI el ASIN de Fase 1 demuestra ventas consistentes, ENTONCES crear marca propia.
-- Registrar trademark en USPTO, hacer Brand Registry en Amazon.
-- El MISMO proveedor chino fabrica el producto pero con la marca y packaging del cliente.
-- Acceso a A+ Content, Brand Store, protección de listing.
-- Esto se hace DESPUÉS de validar, nunca al inicio.
-
-IMPORTANTE: Hay nichos donde la Fase 1 NO funciona porque los compradores SOLO confían en marcas conocidas (ej: suplementos, comida para bebés, productos médicos). En esos casos, indicar que se necesita marca propia desde el inicio o evitar el nicho.
-
-Tu cliente tiene ${b:,} USD para invertir en Fase 1.
+{profile_prompt}
 
 RESPONDE TODO EN ESPAÑOL.
 
@@ -701,19 +765,15 @@ Responde SOLO con JSON válido (sin markdown):
         if not analysis_resp:
             raise ValueError("Analysis not found")
 
-        b = budget or DEFAULT_BUDGET
+        profile = await get_user_profile()
+        b = budget or profile.budget or DEFAULT_BUDGET
         analysis_data = analysis_resp.model_dump()
         context = self._build_analysis_context(analysis_data, budget=b)
+        profile_prompt = self._build_profile_prompt(profile, b)
 
         system = f"""Eres un experto estratega de Amazon FBA y sourcing desde China. RESPONDE TODO EN ESPAÑOL.
-Tu cliente tiene ${b:,} USD para invertir.
 
-MODELO DE NEGOCIO (MUY IMPORTANTE):
-- El cliente SOLO vende productos CONSUMIBLES en Amazon (recompra recurrente). NUNCA sugieras abandonar consumibles — es el core del negocio.
-- Fase 1 = comprar productos que el proveedor chino YA tiene con SU marca y packaging listo. Revender en Amazon bajo esa marca. $0 en branding, entrada inmediata.
-- Fase 2 = SOLO si Fase 1 valida ventas, crear marca privada propia (trademark USPTO + Brand Registry).
-- Cuando pregunten "genérica o marca privada": genérica = marca del proveedor chino (packaging listo), marca privada = marca propia del cliente.
-- Si un nicho es NO-GO, sugiere otros nichos CONSUMIBLES viables, nunca productos no-consumibles.
+{profile_prompt}
 
 Tienes acceso a los datos completos de este nicho:
 

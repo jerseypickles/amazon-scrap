@@ -382,6 +382,17 @@ export interface SmartNichesResponse {
   analyzed_count: number;
 }
 
+// User Profile types
+export interface UserProfile {
+  business_model: string; // "generic_only" | "brand_only" | "generic_then_brand"
+  product_type: string; // "consumable_only" | "any" | "non_consumable_only"
+  budget: number;
+  experience: string; // "beginner" | "intermediate" | "advanced"
+  fulfillment: string; // "fba" | "fbm" | "both"
+  marketplace: string; // "US" | "MX" | "CA" | "UK" | "DE"
+  updated_at?: string | null;
+}
+
 // ASIN Tracker types
 export interface ProductSnapshot {
   date: string;

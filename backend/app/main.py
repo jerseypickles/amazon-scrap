@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import init_db, close_db
 from app.routers import analysis, categories, search
-from app.routers import ai_advisor, watchlist, product_tracker
+from app.routers import ai_advisor, watchlist, product_tracker, profile
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,6 +32,7 @@ app.include_router(analysis.router)
 app.include_router(ai_advisor.router)
 app.include_router(watchlist.router)
 app.include_router(product_tracker.router)
+app.include_router(profile.router)
 
 scheduler = AsyncIOScheduler()
 

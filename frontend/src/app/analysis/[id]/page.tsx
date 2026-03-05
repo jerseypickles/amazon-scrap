@@ -1,17 +1,24 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, TrendingUp, Users, DollarSign, Star, ShieldCheck, Search,
   Brain, Eye, Loader2, Lightbulb, AlertTriangle, Target, CheckCircle,
-  Factory, Repeat, ExternalLink, Package, Crown, Award, BadgeCheck, Flame, RefreshCw,
+  Factory, Repeat, ExternalLink, Package, Award, BadgeCheck, Flame, RefreshCw,
   Layers, Crosshair, BarChart3, Zap, MessageCircle, Send, Megaphone, Truck, BarChart2,
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { getAnalysis, getAIAnalysis, refreshAIAnalysis, getAnalysisProducts, addToWatchlist, checkWatchlist, rescrapeAnalysis, aiChat, analyzeNiche, trackProduct } from "@/lib/api";
 import type { NicheAnalysis, AIInsight, Product, ScoreBreakdown } from "@/types";
+
+// Three.js components — dynamic import (client-side only, no SSR)
+const ScoreOrb3D = dynamic(() => import("@/components/ScoreOrb3D"), { ssr: false });
+const ScoreRadar3D = dynamic(() => import("@/components/ScoreRadar3D"), { ssr: false });
+const SaturationRing3D = dynamic(() => import("@/components/SaturationRing3D"), { ssr: false });
+const MetricPillars3D = dynamic(() => import("@/components/MetricPillars3D"), { ssr: false });
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -23,8 +30,6 @@ function formatBudget(n: number) {
 }
 
 const BUDGET_PRESETS = [5000, 10000, 15000, 20000, 30000, 50000];
-
-const COLORS = ["#f97316", "#6366f1", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#06b6d4", "#8b5cf6"];
 
 function scoreColor(s: number | null) {
   if (s === null) return "var(--text-muted)";
@@ -71,7 +76,7 @@ function ScoreGauge({ label, score, icon: Icon, desc, loading }: { label: string
 
 const tooltipStyle = { background: "#111420", border: "1px solid #1e2336", borderRadius: "10px", fontSize: "12px" };
 
-function BreakdownSection({ title, icon: Icon, color, score, breakdown }: { title: string; icon: React.ElementType; color: string; score: number | null; breakdown: ScoreBreakdown[] }) {
+function BreakdownSection({ title, icon: Icon, color, score, breakdown }: { title: string; icon: React.ComponentType<{ size?: number; color?: string }>; color: string; score: number | null; breakdown: ScoreBreakdown[] }) {
   if (!breakdown || breakdown.length === 0) return null;
   return (
     <div className="card">
@@ -101,12 +106,6 @@ function BreakdownSection({ title, icon: Icon, color, score, breakdown }: { titl
       </div>
     </div>
   );
-}
-
-function threatColor(level: string) {
-  if (level === "high") return "#ef4444";
-  if (level === "medium") return "#f59e0b";
-  return "#10b981";
 }
 
 function severityColor(s: string) {
@@ -451,7 +450,6 @@ export default function AnalysisDetailPage() {
     </div>
   );
 
-  const brandPie = analysis.top_brands.slice(0, 6).map((b) => ({ name: b.name, value: b.count }));
   const visibleProducts = showAllProducts ? products : products.slice(0, 15);
 
   return (
@@ -461,61 +459,77 @@ export default function AnalysisDetailPage() {
         <ArrowLeft size={14} /> Volver al Historial
       </Link>
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold capitalize">{analysis.keyword}</h1>
-            {analysis.parent_keyword && (
-              <span className="text-[9px] font-bold px-2 py-1 rounded-full flex items-center gap-1" style={{ background: "rgba(168,85,247,0.1)", color: "#a855f7", border: "1px solid rgba(168,85,247,0.2)" }}>
-                <Layers size={10} /> Sub-nicho
-              </span>
-            )}
-          </div>
-          <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-            {analysis.parent_keyword && (
-              <span style={{ color: "#a855f7" }}>De &ldquo;{analysis.parent_keyword}&rdquo; &middot; </span>
-            )}
-            {analysis.total_products} productos &middot; {analysis.brand_count} marcas &middot; {analysis.created_at ? new Date(analysis.created_at).toLocaleString("es") : ""}
-          </p>
+      {/* ===== 3D HERO SECTION ===== */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {/* Left: 3D Score Orb */}
+        <div className="card flex flex-col items-center justify-center" style={{ minHeight: 320 }}>
+          <ScoreOrb3D score={analysis.opportunity_score} loading={rescraping} />
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleWatch}
-            disabled={watched}
-            className="btn"
-            style={watched
-              ? { background: "rgba(16,185,129,0.15)", color: "#10b981", border: "1px solid rgba(16,185,129,0.3)", cursor: "default" }
-              : undefined
-            }
-          >
-            <Eye size={16} />
-            {watched ? "Vigilando ✓" : "Vigilar"}
-          </button>
-          <button
-            onClick={handleRescrape}
-            disabled={rescraping}
-            className="btn btn-primary"
-          >
-            {rescraping ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-            {rescraping ? "Recalculando..." : "Recalcular"}
-          </button>
-          <button onClick={handleRefreshAI} disabled={aiLoading} className="btn btn-secondary">
-            {aiLoading ? <Loader2 size={16} className="animate-spin" /> : <Brain size={16} />}
-            {aiLoading ? "Analizando..." : "Refrescar IA"}
-          </button>
-          <div className="text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Score</p>
-            {rescraping ? (
-              <div className="flex items-center justify-center h-16">
-                <Loader2 size={32} className="animate-spin" style={{ color: "var(--accent)" }} />
-              </div>
-            ) : (
-              <div className="text-5xl font-black stat-glow" style={{ color: scoreColor(analysis.opportunity_score), transition: "color 0.3s ease" }}>
-                {analysis.opportunity_score ?? "--"}
-              </div>
-            )}
+
+        {/* Center: Header Info + Actions */}
+        <div className="flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-2xl font-bold capitalize">{analysis.keyword}</h1>
+              {analysis.parent_keyword && (
+                <span className="text-[9px] font-bold px-2 py-1 rounded-full flex items-center gap-1" style={{ background: "rgba(168,85,247,0.1)", color: "#a855f7", border: "1px solid rgba(168,85,247,0.2)" }}>
+                  <Layers size={10} /> Sub-nicho
+                </span>
+              )}
+            </div>
+            <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>
+              {analysis.parent_keyword && (
+                <span style={{ color: "#a855f7" }}>De &ldquo;{analysis.parent_keyword}&rdquo; &middot; </span>
+              )}
+              {analysis.total_products} productos &middot; {analysis.brand_count} marcas
+            </p>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              {analysis.created_at ? new Date(analysis.created_at).toLocaleString("es") : ""}
+            </p>
           </div>
+
+          {/* Quick metrics */}
+          <div className="grid grid-cols-2 gap-2 my-4">
+            {[
+              { l: "Precio Prom", v: analysis.avg_price ? `$${analysis.avg_price.toFixed(2)}` : "--", c: "#f59e0b" },
+              { l: "Rating Prom", v: analysis.avg_rating?.toFixed(1) ?? "--", c: "#f59e0b" },
+              { l: "Reviews Prom", v: analysis.avg_reviews?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? "--", c: "#6366f1" },
+              { l: "% Prime", v: analysis.prime_percentage != null ? `${analysis.prime_percentage}%` : "--", c: "#10b981" },
+            ].map((m) => (
+              <div key={m.l} className="p-2.5 rounded-xl" style={{ background: "var(--bg-elevated)" }}>
+                <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>{m.l}</p>
+                <p className="text-sm font-bold mt-0.5" style={{ color: m.c }}>{m.v}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap gap-2">
+            <button onClick={handleWatch} disabled={watched} className="btn text-xs"
+              style={watched ? { background: "rgba(16,185,129,0.15)", color: "#10b981", border: "1px solid rgba(16,185,129,0.3)", cursor: "default" } : undefined}
+            >
+              <Eye size={14} /> {watched ? "Vigilando" : "Vigilar"}
+            </button>
+            <button onClick={handleRescrape} disabled={rescraping} className="btn btn-primary text-xs">
+              {rescraping ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              {rescraping ? "Recalculando..." : "Recalcular"}
+            </button>
+            <button onClick={handleRefreshAI} disabled={aiLoading} className="btn btn-secondary text-xs">
+              {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Brain size={14} />}
+              {aiLoading ? "Analizando..." : "Refrescar IA"}
+            </button>
+          </div>
+        </div>
+
+        {/* Right: 3D Radar — 4 sub-scores */}
+        <div className="card" style={{ minHeight: 320 }}>
+          <ScoreRadar3D
+            demand={analysis.demand_score}
+            competition={analysis.competition_score}
+            price={analysis.price_score}
+            quality={analysis.quality_gap_score}
+            loading={rescraping}
+          />
         </div>
       </div>
 
@@ -1170,12 +1184,17 @@ export default function AnalysisDetailPage() {
         </div>
       )}
 
-      {/* Score Gauges */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <ScoreGauge label="Demanda" score={analysis.demand_score} icon={TrendingUp} desc="Compras reales + reviews" loading={rescraping} />
-        <ScoreGauge label="Competencia" score={analysis.competition_score} icon={Users} desc="Mayor = menos competencia" loading={rescraping} />
-        <ScoreGauge label="Precio" score={analysis.price_score} icon={DollarSign} desc="Margen neto FBA" loading={rescraping} />
-        <ScoreGauge label="Calidad" score={analysis.quality_gap_score} icon={Star} desc="Insatisfacción = oportunidad" loading={rescraping} />
+      {/* 3D Key Metrics Pillars */}
+      <div className="card mb-8">
+        <h3 className="text-sm font-bold mb-2 flex items-center gap-2">
+          <BarChart3 size={16} color="var(--accent)" /> Pilares del Nicho
+        </h3>
+        <MetricPillars3D metrics={[
+          { label: "Precio Prom", value: analysis.avg_price ? `$${analysis.avg_price.toFixed(0)}` : "--", normalizedHeight: Math.min(1, (analysis.avg_price ?? 0) / 100), color: "#f59e0b" },
+          { label: "Reviews Med", value: analysis.median_reviews?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? "--", normalizedHeight: Math.min(1, (analysis.median_reviews ?? 0) / 2000), color: "#6366f1" },
+          { label: "BSR Prom", value: analysis.avg_bsr ? `${(analysis.avg_bsr / 1000).toFixed(0)}K` : "--", normalizedHeight: Math.min(1, 1 - (analysis.avg_bsr ?? 0) / 500000), color: "#10b981" },
+          { label: "Revenue Est", value: analysis.revenue_estimate ? `$${(analysis.revenue_estimate / 1000).toFixed(0)}K` : "--", normalizedHeight: Math.min(1, (analysis.revenue_estimate ?? 0) / 50000), color: "#ef4444" },
+        ]} />
       </div>
 
       {/* Score Breakdowns — 4-card grid */}
@@ -1225,41 +1244,26 @@ export default function AnalysisDetailPage() {
         ))}
       </div>
 
-      {/* Market Saturation */}
+      {/* 3D Market Saturation Ring */}
       {analysis.saturation && (
         <div className="card mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Layers size={16} color="#6366f1" />
-              <h3 className="text-sm font-bold">Saturaci&oacute;n del Mercado</h3>
-            </div>
-            <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{
-              background: analysis.saturation.verdict === "Saturado" ? "rgba(239,68,68,0.1)" : analysis.saturation.verdict === "Moderado" ? "rgba(245,158,11,0.1)" : "rgba(16,185,129,0.1)",
-              color: analysis.saturation.verdict === "Saturado" ? "#ef4444" : analysis.saturation.verdict === "Moderado" ? "#f59e0b" : "#10b981",
-            }}>
-              {analysis.saturation.verdict}
-            </span>
+          <div className="flex items-center gap-2 mb-2">
+            <Layers size={16} color="#6366f1" />
+            <h3 className="text-sm font-bold">Saturación del Mercado</h3>
           </div>
-          {/* Stacked bar */}
-          <div className="w-full h-6 rounded-full overflow-hidden flex mb-3" style={{ background: "rgba(255,255,255,0.04)" }}>
-            {[
-              { pct: analysis.saturation.newcomers_pct, color: "#10b981", label: "Nuevos" },
-              { pct: analysis.saturation.growing_pct, color: "#6366f1", label: "Crecimiento" },
-              { pct: analysis.saturation.established_pct, color: "#f59e0b", label: "Establecidos" },
-              { pct: analysis.saturation.dominant_pct, color: "#ef4444", label: "Dominantes" },
-            ].map((seg) => seg.pct > 0 && (
-              <div
-                key={seg.label}
-                className="h-full flex items-center justify-center text-[9px] font-bold transition-all"
-                style={{ width: `${seg.pct}%`, background: seg.color, minWidth: seg.pct > 5 ? "auto" : 0 }}
-                title={`${seg.label}: ${seg.pct.toFixed(1)}%`}
-              >
-                {seg.pct >= 10 && `${seg.pct.toFixed(0)}%`}
-              </div>
-            ))}
-          </div>
-          {/* Legend */}
-          <div className="grid grid-cols-4 gap-2">
+          <SaturationRing3D
+            newcomers={analysis.saturation.newcomers}
+            growing={analysis.saturation.growing}
+            established={analysis.saturation.established}
+            dominant={analysis.saturation.dominant}
+            newcomersPct={analysis.saturation.newcomers_pct}
+            growingPct={analysis.saturation.growing_pct}
+            establishedPct={analysis.saturation.established_pct}
+            dominantPct={analysis.saturation.dominant_pct}
+            verdict={analysis.saturation.verdict}
+          />
+          {/* Legend row */}
+          <div className="grid grid-cols-4 gap-2 mt-2">
             {[
               { label: "Nuevos (<50 rev)", count: analysis.saturation.newcomers, pct: analysis.saturation.newcomers_pct, color: "#10b981" },
               { label: "Crecimiento (50-200)", count: analysis.saturation.growing, pct: analysis.saturation.growing_pct, color: "#6366f1" },
@@ -1413,26 +1417,20 @@ export default function AnalysisDetailPage() {
         </div>
 
         <div className="card">
-          <h3 className="text-sm font-bold mb-1">Cuota de Mercado por Marca</h3>
-          <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>Top 3: {analysis.top3_brand_share?.toFixed(1)}%</p>
-          <ResponsiveContainer width="100%" height={230}>
-            <PieChart>
-              <Pie data={brandPie} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="value"
-                label={
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  ((p: any) => `${String(p.name ?? "").slice(0, 10)}`) as any
-                }
-              >
-                {brandPie.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-              </Pie>
+          <h3 className="text-sm font-bold mb-4">Distribución de Reviews</h3>
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={analysis.review_distribution}>
+              <XAxis dataKey="range" tick={{ fill: "#5c6380", fontSize: 11 }} />
+              <YAxis tick={{ fill: "#5c6380", fontSize: 11 }} />
               <Tooltip contentStyle={tooltipStyle} />
-            </PieChart>
+              <Bar dataKey="count" fill="#10b981" radius={[6, 6, 0, 0]} />
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Charts Row 2 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      {/* Ratings Distribution */}
+      <div className="grid grid-cols-1 gap-6 mb-8">
         <div className="card">
           <h3 className="text-sm font-bold mb-4">Distribución de Ratings</h3>
           <ResponsiveContainer width="100%" height={200}>
@@ -1444,99 +1442,8 @@ export default function AnalysisDetailPage() {
             </BarChart>
           </ResponsiveContainer>
         </div>
-        <div className="card">
-          <h3 className="text-sm font-bold mb-4">Distribución de Reviews</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={analysis.review_distribution}>
-              <XAxis dataKey="range" tick={{ fill: "#5c6380", fontSize: 11 }} />
-              <YAxis tick={{ fill: "#5c6380", fontSize: 11 }} />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Bar dataKey="count" fill="#10b981" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
       </div>
 
-      {/* Brands Table */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(99,102,241,0.1)" }}>
-            <Crown size={16} color="var(--info)" />
-          </div>
-          <h2 className="text-lg font-bold">Ranking de Marcas</h2>
-        </div>
-        {analysis.top_brands.length === 0 ? (
-          <div className="card text-center py-10">
-            <Crown size={24} style={{ color: "var(--text-muted)", margin: "0 auto 8px" }} />
-            <p className="text-sm font-semibold" style={{ color: "var(--text-muted)" }}>
-              No hay datos de marcas disponibles
-            </p>
-            <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-              Haz clic en &ldquo;Recalcular&rdquo; para re-scrapear con datos de marcas actualizados
-            </p>
-          </div>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Marca</th>
-                  <th style={{ textAlign: "right" }}>Productos</th>
-                  <th style={{ textAlign: "right" }}>Cuota</th>
-                  <th style={{ textAlign: "right" }}>Precio Prom</th>
-                  <th style={{ textAlign: "right" }}>Rating</th>
-                  <th style={{ textAlign: "right" }}>Reviews Total</th>
-                  <th style={{ textAlign: "center" }}>Badges</th>
-                  <th style={{ textAlign: "center" }}>Amenaza</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analysis.top_brands.map((b, i) => (
-                  <tr key={b.name}>
-                    <td style={{ color: "var(--text-muted)" }}>{i + 1}</td>
-                    <td className="font-medium">{b.name}</td>
-                    <td style={{ textAlign: "right" }}>{b.count}</td>
-                    <td style={{ textAlign: "right" }}>
-                      <span className="font-bold" style={{ color: "var(--accent)" }}>{b.market_share.toFixed(1)}%</span>
-                    </td>
-                    <td style={{ textAlign: "right" }}>{b.avg_price ? `$${b.avg_price.toFixed(2)}` : "--"}</td>
-                    <td style={{ textAlign: "right" }}>{b.avg_rating?.toFixed(1) ?? "--"}</td>
-                    <td style={{ textAlign: "right" }}>{b.total_reviews.toLocaleString()}</td>
-                    <td style={{ textAlign: "center" }}>
-                      <div className="flex items-center justify-center gap-1">
-                        {b.best_seller_count > 0 && (
-                          <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: "rgba(249,115,22,0.1)", color: "#f97316" }} title={`${b.best_seller_count} Best Seller`}>
-                            <Award size={8} className="inline -mt-px" /> {b.best_seller_count}
-                          </span>
-                        )}
-                        {b.amazon_choice_count > 0 && (
-                          <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: "rgba(16,185,129,0.1)", color: "#10b981" }} title={`${b.amazon_choice_count} Amazon Choice`}>
-                            <BadgeCheck size={8} className="inline -mt-px" /> {b.amazon_choice_count}
-                          </span>
-                        )}
-                        {b.has_monthly_bought && (
-                          <span className="text-[8px] font-bold px-1 py-0.5 rounded" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }} title="Tiene ventas mensuales">
-                            <Flame size={8} className="inline -mt-px" />
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td style={{ textAlign: "center" }}>
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{
-                        background: `${threatColor(b.threat_level)}15`,
-                        color: threatColor(b.threat_level),
-                      }}>
-                        {b.threat_level === "high" ? "Alta" : b.threat_level === "medium" ? "Media" : "Baja"}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
 
       {/* Summary — data-based quick verdict */}
       {(() => {
