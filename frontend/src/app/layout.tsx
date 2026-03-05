@@ -19,7 +19,7 @@ import {
   Package,
   Settings,
 } from "lucide-react";
-import { getNotifications, markNotificationRead, markAllNotificationsRead } from "@/lib/api";
+import { getNotifications, markNotificationRead, markAllNotificationsRead, getUserProfile } from "@/lib/api";
 import type { AppNotification } from "@/types";
 import "./globals.css";
 
@@ -188,6 +188,13 @@ function NotificationPanel() {
 
 function Sidebar() {
   const pathname = usePathname();
+  const [budget, setBudget] = useState(10000);
+
+  useEffect(() => {
+    getUserProfile()
+      .then((p) => { if (p?.budget) setBudget(p.budget); })
+      .catch(() => {});
+  }, []);
 
   return (
     <aside className="sidebar">
@@ -257,7 +264,7 @@ function Sidebar() {
                 Presupuesto
               </span>
             </div>
-            <span className="text-xs font-black" style={{ color: "var(--accent)" }}>$10,000</span>
+            <span className="text-xs font-black" style={{ color: "var(--accent)" }}>${budget.toLocaleString()}</span>
           </div>
           <p className="text-[11px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
             Busca productos consumibles con alta recompra. La IA calcula costos China, m\u00e1rgenes y ROI.

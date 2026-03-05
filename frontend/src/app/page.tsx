@@ -15,7 +15,7 @@ import {
   Target,
   Layers,
 } from "lucide-react";
-import { getDashboard } from "@/lib/api";
+import { getDashboard, getUserProfile } from "@/lib/api";
 import type { DashboardSummary, NicheAnalysis } from "@/types";
 
 function scoreColor(s: number | null) {
@@ -122,10 +122,17 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [budget, setBudget] = useState(10000);
 
   useEffect(() => {
-    getDashboard()
-      .then(setData)
+    Promise.all([
+      getDashboard(),
+      getUserProfile().catch(() => null),
+    ])
+      .then(([d, profile]) => {
+        setData(d);
+        if (profile?.budget) setBudget(profile.budget);
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
@@ -196,7 +203,7 @@ export default function DashboardPage() {
               <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
                 Presupuesto de Inversión
               </p>
-              <p className="text-2xl font-black stat-glow" style={{ color: "var(--accent)" }}>$10,000</p>
+              <p className="text-2xl font-black stat-glow" style={{ color: "var(--accent)" }}>${budget.toLocaleString()}</p>
             </div>
           </div>
           <div className="flex items-center gap-8">
@@ -287,7 +294,7 @@ export default function DashboardPage() {
           <h2 className="text-xl font-bold mb-2">Encuentra Tu Nicho Consumible</h2>
           <p className="text-sm mb-2 max-w-lg mx-auto" style={{ color: "var(--text-secondary)" }}>
             Busca productos que los clientes recompran cada semana — detergentes, suplementos, snacks, cuidado personal.
-            La IA analiza costos China, márgenes FBA y ROI para tu presupuesto de $10,000.
+            La IA analiza costos China, márgenes FBA y ROI para tu presupuesto de ${budget.toLocaleString()}.
           </p>
           <div className="flex items-center justify-center gap-4 mb-8">
             {["Detergente", "Proteína", "Café", "Vitaminas"].map((niche) => (
