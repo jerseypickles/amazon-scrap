@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+venv/
+
+# Build output
+.next/
+__pycache__/
+*.pyc
+
+# Environment & secrets
+.env
+backend/.env
+
+# Local databases
+*.db
+
+# OS
+.DS_Store
+
+# IDE
+.claude/
+
+# Misc
+PLAN.md

@@ -1,0 +1,403 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+import random
+import re
+from urllib.parse import quote_plus
+
+import httpx
+from bs4 import BeautifulSoup
+
+from app.config import settings
+
+logger = logging.getLogger(__name__)
+
+USER_AGENTS = [
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15",
+]
+
+AMAZON_BASE_URL = "https://www.amazon.com"
+SCRAPER_API_BASE = "https://api.scraperapi.com"
+
+
+class AmazonScraper:
+    def __init__(self):
+        self.api_key = settings.scraper_api_key
+        self.use_api = bool(self.api_key)
+
+    def _get_headers(self) -> dict:
+        return {
+            "User-Agent": random.choice(USER_AGENTS),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+        }
+
+    # ── Structured API methods (primary when API key exists) ──────────
+
+    async def _structured_search(self, keyword: str, page: int = 1) -> list[dict]:
+        """Use ScraperAPI structured Amazon search endpoint."""
+        url = (
+            f"{SCRAPER_API_BASE}/structured/amazon/search"
+            f"?api_key={self.api_key}"
+            f"&query={quote_plus(keyword)}"
+            f"&country_code=us"
+            f"&page={page}"
+        )
+        async with httpx.AsyncClient(timeout=90.0) as client:
+            try:
+                resp = await client.get(url)
+                if resp.status_code != 200:
+                    logger.warning(
+                        "Structured search got status %d for '%s' page %d",
+                        resp.status_code, keyword, page,
+                    )
+                    return []
+                data = resp.json()
+            except (httpx.HTTPError, ValueError) as e:
+                logger.error("Structured search error for '%s': %s", keyword, e)
+                return []
+
+        results = data.get("results", [])
+        products = []
+        for item in results:
+            try:
+                product = self._parse_structured_item(item, keyword)
+                if product and product.get("title"):
+                    products.append(product)
+            except Exception as e:
+                logger.debug("Error parsing structured item: %s", e)
+                continue
+
+        logger.info(
+            "Structured search: '%s' page %d → %d products",
+            keyword, page, len(products),
+        )
+        return products
+
+    def _parse_structured_item(self, item: dict, keyword: str) -> dict | None:
+        asin = item.get("asin", "")
+        if not asin:
+            return None
+
+        # Price — structured endpoint returns object or direct value
+        price = None
+        original_price = None
+        price_data = item.get("price_lower", item.get("price"))
+        if isinstance(price_data, (int, float)):
+            price = float(price_data)
+        elif isinstance(price_data, dict):
+            price = price_data.get("price")
+            if isinstance(price, str):
+                price = float(price.replace("$", "").replace(",", "")) if price else None
+
+        orig_data = item.get("original_price")
+        if isinstance(orig_data, (int, float)):
+            original_price = float(orig_data)
+        elif isinstance(orig_data, dict):
+            op = orig_data.get("price")
+            if isinstance(op, str):
+                original_price = float(op.replace("$", "").replace(",", "")) if op else None
+            elif isinstance(op, (int, float)):
+                original_price = float(op)
+
+        # Monthly bought — e.g. "60K+ bought in past month"
+        monthly_bought = item.get("purchase_history_message") or item.get("recently_bought") or None
+
+        return {
+            "asin": asin,
+            "title": item.get("name", ""),
+            "brand": item.get("brand") or None,
+            "price": price,
+            "original_price": original_price,
+            "rating": float(item["stars"]) if item.get("stars") else None,
+            "reviews_count": int(item["total_reviews"]) if item.get("total_reviews") else None,
+            "image_url": item.get("image") or item.get("image_url") or None,
+            "product_url": item.get("url") or f"{AMAZON_BASE_URL}/dp/{asin}",
+            "is_prime": bool(item.get("has_prime")),
+            "is_best_seller": bool(item.get("is_best_seller")),
+            "is_amazon_choice": bool(item.get("is_amazon_choice")),
+            "monthly_bought": monthly_bought,
+            "search_keyword": keyword,
+        }
+
+    async def _structured_product_detail(self, asin: str) -> dict | None:
+        """Use ScraperAPI structured Amazon product endpoint."""
+        url = (
+            f"{SCRAPER_API_BASE}/structured/amazon/product"
+            f"?api_key={self.api_key}"
+            f"&asin={asin}"
+            f"&country_code=us"
+        )
+        async with httpx.AsyncClient(timeout=90.0) as client:
+            try:
+                resp = await client.get(url)
+                if resp.status_code != 200:
+                    logger.warning("Structured product got status %d for %s", resp.status_code, asin)
+                    return None
+                data = resp.json()
+            except (httpx.HTTPError, ValueError) as e:
+                logger.error("Structured product error for %s: %s", asin, e)
+                return None
+
+        # BSR from product_category or bestsellers_rank
+        bsr = None
+        bsr_category = None
+        bsr_data = data.get("bestsellers_rank", [])
+        if isinstance(bsr_data, list) and bsr_data:
+            top = bsr_data[0]
+            bsr = top.get("rank")
+            bsr_category = top.get("category")
+        elif data.get("product_category"):
+            bsr_category = data["product_category"]
+
+        # Features
+        features = None
+        feat_list = data.get("feature_bullets", [])
+        if isinstance(feat_list, list) and feat_list:
+            features = " | ".join(str(f) for f in feat_list[:5])
+
+        # Description
+        description = data.get("product_description") or data.get("description") or None
+
+        # Sold by
+        sold_by = data.get("sold_by") or None
+
+        return {
+            "asin": asin,
+            "bsr": bsr,
+            "bsr_category": bsr_category,
+            "description": description,
+            "features": features,
+            "sold_by": sold_by,
+        }
+
+    # ── Public API (auto-selects structured vs HTML) ──────────────────
+
+    async def search_products(self, keyword: str, page: int = 1) -> list[dict]:
+        if self.use_api:
+            products = await self._structured_search(keyword, page)
+            if products:
+                return products
+            logger.info("Structured search empty, falling back to HTML scrape for '%s'", keyword)
+        return await self._html_search(keyword, page)
+
+    async def search_products_multi_page(self, keyword: str, pages: int = 2) -> list[dict]:
+        all_products = []
+        for page in range(1, pages + 1):
+            products = await self.search_products(keyword, page)
+            all_products.extend(products)
+            if page < pages:
+                await asyncio.sleep(random.uniform(1.0, 3.0))
+        return all_products
+
+    async def get_product_detail(self, asin: str) -> dict | None:
+        if self.use_api:
+            detail = await self._structured_product_detail(asin)
+            if detail:
+                return detail
+            logger.info("Structured product empty, falling back to HTML scrape for %s", asin)
+        return await self._html_product_detail(asin)
+
+    # ── HTML fallback methods (original scraping logic) ───────────────
+
+    async def _fetch_page(self, url: str) -> str | None:
+        if self.use_api:
+            api_url = f"{SCRAPER_API_BASE}?api_key={self.api_key}&url={quote_plus(url)}&country_code=us"
+            target_url = api_url
+        else:
+            target_url = url
+
+        async with httpx.AsyncClient(
+            timeout=60.0, follow_redirects=True
+        ) as client:
+            try:
+                resp = await client.get(target_url, headers=self._get_headers())
+                if resp.status_code == 200:
+                    return resp.text
+                logger.warning("Got status %d for %s", resp.status_code, url)
+                return None
+            except httpx.HTTPError as e:
+                logger.error("HTTP error fetching %s: %s", url, e)
+                return None
+
+    async def _html_search(self, keyword: str, page: int = 1) -> list[dict]:
+        url = f"{AMAZON_BASE_URL}/s?k={quote_plus(keyword)}&page={page}"
+        html = await self._fetch_page(url)
+        if not html:
+            return []
+        return self._parse_search_results(html, keyword)
+
+    async def _html_product_detail(self, asin: str) -> dict | None:
+        url = f"{AMAZON_BASE_URL}/dp/{asin}"
+        html = await self._fetch_page(url)
+        if not html:
+            return None
+        return self._parse_product_detail(html, asin)
+
+    def _parse_search_results(self, html: str, keyword: str) -> list[dict]:
+        soup = BeautifulSoup(html, "lxml")
+        products = []
+
+        items = soup.select('[data-component-type="s-search-result"]')
+        for item in items:
+            try:
+                product = self._extract_search_item(item, keyword)
+                if product and product.get("title"):
+                    products.append(product)
+            except Exception as e:
+                logger.debug("Error parsing item: %s", e)
+                continue
+
+        return products
+
+    def _extract_search_item(self, item, keyword: str) -> dict | None:
+        asin = item.get("data-asin", "")
+        if not asin:
+            return None
+
+        # Title
+        title_el = item.select_one("h2 a span") or item.select_one("h2 span")
+        title = title_el.get_text(strip=True) if title_el else ""
+
+        # Price
+        price = None
+        price_whole = item.select_one(".a-price-whole")
+        price_frac = item.select_one(".a-price-fraction")
+        if price_whole:
+            try:
+                whole = price_whole.get_text(strip=True).replace(",", "").rstrip(".")
+                frac = price_frac.get_text(strip=True) if price_frac else "00"
+                price = float(f"{whole}.{frac}")
+            except ValueError:
+                pass
+
+        # Original price (strikethrough)
+        original_price = None
+        orig_el = item.select_one(".a-text-price .a-offscreen")
+        if orig_el:
+            try:
+                original_price = float(
+                    orig_el.get_text(strip=True).replace("$", "").replace(",", "")
+                )
+            except ValueError:
+                pass
+
+        # Rating
+        rating = None
+        rating_el = item.select_one(".a-icon-alt")
+        if rating_el:
+            try:
+                rating_text = rating_el.get_text(strip=True)
+                rating = float(rating_text.split(" ")[0])
+            except (ValueError, IndexError):
+                pass
+
+        # Reviews count
+        reviews_count = None
+        reviews_el = item.select_one('[aria-label*="stars"] + span a span') or item.select_one(
+            ".a-size-base.s-underline-text"
+        )
+        if reviews_el:
+            try:
+                reviews_count = int(
+                    reviews_el.get_text(strip=True).replace(",", "").replace(".", "")
+                )
+            except ValueError:
+                pass
+
+        # Brand
+        brand = None
+        brand_el = item.select_one(".a-size-base-plus.a-color-base") or item.select_one(
+            ".a-row .a-size-base:first-child"
+        )
+        if brand_el:
+            brand = brand_el.get_text(strip=True)
+
+        # Image
+        image_url = None
+        img_el = item.select_one(".s-image")
+        if img_el:
+            image_url = img_el.get("src", "")
+
+        # Prime
+        is_prime = bool(item.select_one(".a-icon-prime"))
+
+        # Product URL — try to extract from link, fallback to ASIN-based URL
+        link_el = item.select_one("h2 a")
+        product_url = None
+        if link_el:
+            href = link_el.get("href", "")
+            if href.startswith("/"):
+                product_url = f"{AMAZON_BASE_URL}{href}"
+            elif href:
+                product_url = href
+        if not product_url and asin:
+            product_url = f"{AMAZON_BASE_URL}/dp/{asin}"
+
+        return {
+            "asin": asin,
+            "title": title,
+            "brand": brand,
+            "price": price,
+            "original_price": original_price,
+            "rating": rating,
+            "reviews_count": reviews_count,
+            "image_url": image_url,
+            "product_url": product_url,
+            "is_prime": is_prime,
+            "is_best_seller": False,
+            "is_amazon_choice": False,
+            "monthly_bought": None,
+            "search_keyword": keyword,
+        }
+
+    def _parse_product_detail(self, html: str, asin: str) -> dict:
+        soup = BeautifulSoup(html, "lxml")
+
+        # BSR
+        bsr = None
+        bsr_category = None
+        bsr_el = soup.select_one("#SalesRank") or soup.find(
+            "th", string=lambda t: t and "Best Sellers Rank" in t
+        )
+        if bsr_el:
+            parent = bsr_el.parent if bsr_el.name == "th" else bsr_el
+            text = parent.get_text()
+            match = re.search(r"#([\d,]+)\s+in\s+(.+?)(?:\(|$)", text)
+            if match:
+                try:
+                    bsr = int(match.group(1).replace(",", ""))
+                    bsr_category = match.group(2).strip()
+                except ValueError:
+                    pass
+
+        # Description
+        description = None
+        desc_el = soup.select_one("#productDescription p") or soup.select_one(
+            "#productDescription"
+        )
+        if desc_el:
+            description = desc_el.get_text(strip=True)
+
+        # Features/bullet points
+        features = None
+        feat_el = soup.select("#feature-bullets li span.a-list-item")
+        if feat_el:
+            features = " | ".join(f.get_text(strip=True) for f in feat_el[:5])
+
+        return {
+            "asin": asin,
+            "bsr": bsr,
+            "bsr_category": bsr_category,
+            "description": description,
+            "features": features,
+        }
+
+
+scraper = AmazonScraper()
