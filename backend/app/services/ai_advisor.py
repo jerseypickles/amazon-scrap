@@ -306,6 +306,29 @@ Tu análisis NO debe ser una opinión superficial. Debe ser un ESTUDIO EVALUADO 
 5. Cada conclusión debe tener su RAZONAMIENTO visible. No conclusiones sin explicación.
 6. NO asumas que si no puedes ser top 10, fracasarás. Calcula las ventas realistas para posición 30-50-100 y evalúa si eso cubre el VMV.
 
+PENSAMIENTO POR ESCENARIOS (OBLIGATORIO):
+NUNCA des solo un veredicto absoluto. SIEMPRE evalúa múltiples escenarios:
+
+ESCENARIO A — Entrada directa con la keyword tal como está:
+¿Es viable? ¿Con qué estrategia? ¿Cuánto capital mínimo?
+
+ESCENARIO B — Sub-nicho o variación de producto:
+Identifica 2-3 variaciones más específicas (ej: para "laundry detergent" → "laundry detergent sheets", "enzyme laundry detergent", "travel laundry detergent").
+Para cada una: ¿por qué sería más viable? ¿Cuál es la competencia estimada?
+
+ESCENARIO C — Diferenciación de formato/presentación:
+¿Hay un formato diferente al dominante que tenga menos competencia? (ej: pods vs líquido, sheets vs polvo, tamaño travel vs familiar)
+
+Incluso si el ESCENARIO A es difícil, los escenarios B y C pueden ser viables.
+Si un nicho es genuinamente imposible en TODOS los escenarios, explica por qué con datos concretos.
+Pero recuerda: en Amazon, casi siempre hay un ángulo de entrada — lo que cambia es el capital necesario, el margen, y la dificultad.
+
+ANÁLISIS DE LA POSICIÓN 30-100 (OBLIGATORIO):
+No analices solo los top 10. Busca en los datos productos con MENOS reviews (100-500 range) que aún vendan.
+Si existen, eso PRUEBA que un vendedor pequeño puede sobrevivir en este nicho.
+Si NO existen (todos tienen 5000+ reviews), entonces sí es un nicho cerrado.
+Los datos de "newcomers" en saturación te dicen cuántos productos nuevos hay.
+
 Analiza estos datos de Amazon US y da inteligencia accionable:
 
 {context}
@@ -338,7 +361,7 @@ Responde SOLO con JSON válido (sin markdown, sin ```):
         "entrada_generica_viable": true,
         "viable_con_ppc": true,
         "vmv_alcanzable": true,
-        "resumen": "3-5 oraciones con RAZONAMIENTO completo: qué factores analizaste, qué datos sustentan la decisión, qué alternativas consideraste (incluyendo PPC y FBA), y bajo qué condiciones cambiaría el veredicto. INCLUYE el cálculo de VMV: cuántas unidades/mes necesitas y si es realista. NO des solo la conclusión — muestra el proceso de pensamiento."
+        "resumen": "5-8 oraciones con RAZONAMIENTO por escenarios: ESCENARIO A (entrada directa): viable/no viable y por qué. ESCENARIO B (sub-nicho): qué variación específica podría funcionar. ESCENARIO C (formato diferente): qué formato alternativo tiene menos competencia. Para cada escenario incluye: VMV necesario, capital mínimo, probabilidad de éxito. Si el nicho es genuinamente cerrado en TODOS los escenarios, explica qué datos concretos lo prueban (ej: '0 productos con <500 reviews = 0 nuevos entrantes exitosos'). Si hay algún ángulo viable, recomiéndalo."
     }},
     "fase_recomendada": {{
         "fase_actual": "marca_proveedor|marca_privada_necesaria",
@@ -458,7 +481,7 @@ Responde SOLO con JSON válido (sin markdown, sin ```):
         try:
             response = self.client.messages.create(
                 model="claude-sonnet-4-20250514",
-                max_tokens=4000,
+                max_tokens=5000,
                 messages=[{"role": "user", "content": prompt}],
             )
 
