@@ -132,7 +132,7 @@ PRESUPUESTO DISPONIBLE: ${b:,}
         analysis_data = analysis_resp.model_dump()
         context = self._build_analysis_context(analysis_data, budget=b)
 
-        prompt = f"""Eres un experto estratega de Amazon FBA y sourcing de productos desde China (Alibaba/1688).
+        prompt = f"""Eres un experto estratega de Amazon FBA, sourcing desde China (Alibaba/1688), y Amazon PPC/Advertising.
 
 MODELO DE NEGOCIO DEL CLIENTE (MUY IMPORTANTE - LEER COMPLETO):
 El cliente tiene un modelo de 2 fases:
@@ -158,6 +158,13 @@ Tu cliente tiene ${b:,} USD para invertir en Fase 1.
 
 RESPONDE TODO EN ESPAÑOL.
 
+METODOLOGÍA DE ANÁLISIS (MUY IMPORTANTE):
+Tu análisis NO debe ser una opinión superficial. Debe ser un ESTUDIO EVALUADO que demuestra que revisaste cada ángulo:
+1. NO digas simplemente "NO ENTRAR" o "ENTRAR". Razona paso a paso: ¿qué dicen los datos? ¿hay formas alternativas de competir?
+2. SIEMPRE evalúa Amazon PPC/Ads como vía de entrada. Incluso si las marcas dominan orgánicamente, ¿se puede competir con ads en keywords long-tail?
+3. Si el veredicto es negativo, explica EXACTAMENTE qué tendría que cambiar para que fuera viable (ej: "Si la mediana de reviews bajara a 200, o si encontraras un sub-nicho con menos competencia, sería viable con $X/mes en PPC").
+4. Cada conclusión debe tener su RAZONAMIENTO visible. No conclusiones sin explicación.
+
 Analiza estos datos de Amazon US y da inteligencia accionable:
 
 {context}
@@ -168,6 +175,7 @@ IMPORTANTE:
 - Indica claramente si este nicho REQUIERE marca propia desde el inicio.
 - Evalúa el riesgo de competencia por Buy Box (¿cuántos vendedores podrían vender lo mismo?).
 - Si es consumible: calcula frecuencia de recompra, lifetime value.
+- IMPORTANTE AMAZON PPC: Analiza la viabilidad de usar Amazon Sponsored Products para entrar al nicho. Estima CPC, ACOS, y presupuesto mensual recomendado. Evalúa si PPC hace viable un nicho que orgánicamente parece difícil. Identifica keywords long-tail que podrían tener CPC bajo.
 - IMPORTANTE SUB-NICHOS: Analiza la keyword buscada. Si es un término GENÉRICO/AMPLIO (ej: "dog food", "laundry detergent", "vitamins"), identifica 3-5 sub-nichos más específicos DENTRO de esa misma categoría que podrían ser más viables. Los sub-nichos deben ser keywords reales que alguien buscaría en Amazon (ej: para "dog food" → "grain free dog food small breed", "dog food toppers", "freeze dried dog food", "dog probiotics powder"). Incluye estimación de competencia y viabilidad para cada sub-nicho. Si la keyword ya es específica (ej: "organic dog dental chews"), puedes indicar 0 sub-nichos.
 
 Responde SOLO con JSON válido (sin markdown, sin ```):
@@ -185,7 +193,8 @@ Responde SOLO con JSON válido (sin markdown, sin ```):
         "precio_en_rango_fba": true,
         "sin_certificaciones_complejas": true,
         "entrada_generica_viable": true,
-        "resumen": "Resumen de 1-2 oraciones de la decisión Go/No-Go para reventa con marca del proveedor"
+        "viable_con_ppc": true,
+        "resumen": "3-5 oraciones con RAZONAMIENTO completo: qué factores analizaste, qué datos sustentan la decisión, qué alternativas consideraste (incluyendo PPC), y bajo qué condiciones cambiaría el veredicto. NO des solo la conclusión — muestra el proceso de pensamiento."
     }},
     "fase_recomendada": {{
         "fase_actual": "marca_proveedor|marca_privada_necesaria",
@@ -245,6 +254,22 @@ Responde SOLO con JSON válido (sin markdown, sin ```):
         "certificaciones_necesarias": ["FDA", "EPA", etc. según categoría],
         "tiempo_produccion_dias": 15,
         "consejo_negociacion": "Tip para negociar con proveedores chinos que ya tienen su marca lista"
+    }},
+    "estrategia_ppc": {{
+        "viable_con_ppc": true,
+        "razonamiento_ppc": "3-4 oraciones explicando POR QUÉ PPC funciona o no para este nicho. Analiza: ¿los keywords principales están dominados por marcas con presupuestos enormes? ¿Hay keywords long-tail con menos competencia? ¿El precio del producto permite absorber el costo de ads y mantener margen?",
+        "cpc_estimado": "$0.80 - $1.50 (estimación basada en competitividad del nicho y precio promedio)",
+        "acos_objetivo": "25-35% (objetivo realista considerando márgenes)",
+        "presupuesto_mensual_ads": "$300 - $800 (recomendado para primeros 3 meses)",
+        "presupuesto_diario_sugerido": "$10 - $25",
+        "keywords_long_tail": [
+            "keyword long-tail 1 con menor competencia",
+            "keyword long-tail 2 específica",
+            "keyword long-tail 3 de nicho"
+        ],
+        "estrategia_lanzamiento": "Descripción de estrategia PPC para los primeros 30-60-90 días: qué tipo de campañas (auto/manual), cómo escalar, cuándo optimizar",
+        "riesgo_sin_ads": "Qué pasa si NO se usan ads — ¿es posible rankear orgánicamente o es imposible sin PPC?",
+        "breakeven_con_ads": "Cuántas unidades/mes necesitas vender con PPC para ser rentable considerando el costo de ads"
     }},
     "ventajas_competitivas": [
         "Ventaja 1 con este modelo de reventa",
@@ -340,6 +365,7 @@ Responde SOLO con JSON válido (sin markdown, sin ```):
                 "price_in_fba_range": go_raw.get("precio_en_rango_fba", False),
                 "no_complex_certs": go_raw.get("sin_certificaciones_complejas", False),
                 "generic_entry_viable": go_raw.get("entrada_generica_viable", False),
+                "viable_with_ppc": go_raw.get("viable_con_ppc", False),
                 "summary": go_raw.get("resumen", ""),
             }
 
@@ -389,6 +415,23 @@ Responde SOLO con JSON válido (sin markdown, sin ```):
                 "price_range": sn.get("precio_estimado_rango", ""),
             })
 
+        # PPC strategy
+        ppc_raw = es.get("estrategia_ppc", {})
+        ppc_strategy = None
+        if ppc_raw:
+            ppc_strategy = {
+                "viable_with_ppc": ppc_raw.get("viable_con_ppc", False),
+                "ppc_reasoning": ppc_raw.get("razonamiento_ppc", ""),
+                "estimated_cpc": ppc_raw.get("cpc_estimado", ""),
+                "target_acos": ppc_raw.get("acos_objetivo", ""),
+                "monthly_ad_budget": ppc_raw.get("presupuesto_mensual_ads", ""),
+                "daily_budget_suggested": ppc_raw.get("presupuesto_diario_sugerido", ""),
+                "long_tail_keywords": ppc_raw.get("keywords_long_tail", []),
+                "launch_strategy": ppc_raw.get("estrategia_lanzamiento", ""),
+                "risk_without_ads": ppc_raw.get("riesgo_sin_ads", ""),
+                "breakeven_with_ads": ppc_raw.get("breakeven_con_ads", ""),
+            }
+
         return {
             "verdict": es.get("veredicto", ""),
             "score_label": {"excelente": "excellent", "bueno": "good", "moderado": "moderate", "difícil": "difficult", "evitar": "avoid"}.get(es.get("score_label", ""), es.get("score_label", "")),
@@ -405,6 +448,7 @@ Responde SOLO con JSON válido (sin markdown, sin ```):
             },
             "financials": financials,
             "sourcing": sourcing,
+            "ppc_strategy": ppc_strategy,
             "product_ideas": product_ideas,
             "risks": risks,
             "sub_niches": sub_niches,

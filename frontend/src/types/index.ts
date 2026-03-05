@@ -215,6 +215,7 @@ export interface AIGoNoGo {
   price_in_fba_range: boolean;
   no_complex_certs: boolean;
   generic_entry_viable: boolean;
+  viable_with_ppc: boolean;
   summary: string;
 }
 
@@ -225,6 +226,19 @@ export interface AIPhaseRecommendation {
   buy_box_risk?: string;
   private_label_trigger: string;
   private_label_investment: string;
+}
+
+export interface AIPPCStrategy {
+  viable_with_ppc: boolean;
+  ppc_reasoning: string;
+  estimated_cpc: string;
+  target_acos: string;
+  monthly_ad_budget: string;
+  daily_budget_suggested: string;
+  long_tail_keywords: string[];
+  launch_strategy: string;
+  risk_without_ads: string;
+  breakeven_with_ads: string;
 }
 
 export interface AISubNiche {
@@ -245,6 +259,7 @@ export interface AIInsight {
   entry_strategy?: AIEntryStrategy;
   financials?: AIFinancials;
   sourcing?: AISourcing;
+  ppc_strategy?: AIPPCStrategy;
   product_ideas?: AIProductIdea[];
   risks?: AIRisk[];
   sub_niches?: AISubNiche[];

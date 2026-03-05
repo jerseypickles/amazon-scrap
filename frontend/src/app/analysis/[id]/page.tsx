@@ -7,7 +7,7 @@ import {
   ArrowLeft, TrendingUp, Users, DollarSign, Star, ShieldCheck, Search,
   Brain, Eye, Loader2, Lightbulb, AlertTriangle, Target, CheckCircle,
   Factory, Repeat, ExternalLink, Package, Crown, Award, BadgeCheck, Flame, RefreshCw,
-  Layers, Crosshair, BarChart3, Zap, MessageCircle, Send,
+  Layers, Crosshair, BarChart3, Zap, MessageCircle, Send, Megaphone,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { getAnalysis, getAIAnalysis, refreshAIAnalysis, getAnalysisProducts, addToWatchlist, checkWatchlist, rescrapeAnalysis, aiChat, analyzeNiche, trackProduct } from "@/lib/api";
@@ -617,6 +617,11 @@ export default function AnalysisDetailPage() {
                           Recompra {aiInsight.repurchase_weeks} sem
                         </span>
                       )}
+                      {aiInsight.ppc_strategy?.viable_with_ppc && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: "rgba(139,92,246,0.1)", color: "#8b5cf6" }}>
+                          <Megaphone size={9} className="inline -mt-px mr-0.5" /> Viable con PPC
+                        </span>
+                      )}
                       {aiCached && (
                         <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(99,102,241,0.1)", color: "#6366f1" }}>
                           En caché
@@ -675,6 +680,83 @@ export default function AnalysisDetailPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* PPC / Amazon Ads Strategy */}
+          {aiInsight.ppc_strategy && (
+            <div className="card">
+              <div className="flex items-center gap-2 mb-3">
+                <Megaphone size={16} color="#8b5cf6" />
+                <h4 className="text-sm font-bold">Estrategia Amazon PPC</h4>
+                <span
+                  className="text-[9px] px-1.5 py-0.5 rounded-full font-bold"
+                  style={{
+                    background: aiInsight.ppc_strategy.viable_with_ppc ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)",
+                    color: aiInsight.ppc_strategy.viable_with_ppc ? "#10b981" : "#ef4444",
+                  }}
+                >
+                  {aiInsight.ppc_strategy.viable_with_ppc ? "Viable con PPC" : "PPC No Recomendado"}
+                </span>
+              </div>
+
+              {/* PPC Reasoning */}
+              <p className="text-xs mb-3 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                {aiInsight.ppc_strategy.ppc_reasoning}
+              </p>
+
+              {/* PPC Key Metrics */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                {[
+                  { label: "CPC Estimado", value: aiInsight.ppc_strategy.estimated_cpc, color: "#8b5cf6" },
+                  { label: "ACOS Objetivo", value: aiInsight.ppc_strategy.target_acos, color: "#f59e0b" },
+                  { label: "Presupuesto/Mes", value: aiInsight.ppc_strategy.monthly_ad_budget, color: "#ef4444" },
+                  { label: "Presupuesto/Día", value: aiInsight.ppc_strategy.daily_budget_suggested, color: "#6366f1" },
+                ].map((m) => (
+                  <div key={m.label} className="p-2.5 rounded-xl" style={{ background: "var(--bg-elevated)" }}>
+                    <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>{m.label}</p>
+                    <p className="text-sm font-bold mt-0.5" style={{ color: m.color }}>{m.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Long-tail Keywords */}
+              {aiInsight.ppc_strategy.long_tail_keywords?.length > 0 && (
+                <div className="p-2.5 rounded-xl mb-3" style={{ background: "var(--bg-elevated)" }}>
+                  <p className="text-[10px] font-bold uppercase mb-1.5" style={{ color: "var(--text-muted)" }}>Keywords Long-Tail (menor CPC)</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {aiInsight.ppc_strategy.long_tail_keywords.map((kw, i) => (
+                      <span key={i} className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "rgba(139,92,246,0.1)", color: "#8b5cf6" }}>
+                        {kw}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Launch Strategy + Risk without ads */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {aiInsight.ppc_strategy.launch_strategy && (
+                  <div className="p-2.5 rounded-xl" style={{ background: "var(--bg-elevated)" }}>
+                    <p className="text-[10px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Estrategia de Lanzamiento</p>
+                    <p className="text-xs mt-0.5 leading-relaxed">{aiInsight.ppc_strategy.launch_strategy}</p>
+                  </div>
+                )}
+                {aiInsight.ppc_strategy.risk_without_ads && (
+                  <div className="p-2.5 rounded-xl" style={{ background: "var(--bg-elevated)" }}>
+                    <p className="text-[10px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Sin Ads</p>
+                    <p className="text-xs mt-0.5 leading-relaxed">{aiInsight.ppc_strategy.risk_without_ads}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Break-even with ads */}
+              {aiInsight.ppc_strategy.breakeven_with_ads && (
+                <div className="p-2.5 rounded-xl mt-3" style={{ background: "rgba(139,92,246,0.05)", border: "1px solid rgba(139,92,246,0.15)" }}>
+                  <p className="text-[10px] font-bold uppercase" style={{ color: "#8b5cf6" }}>Break-even con PPC</p>
+                  <p className="text-xs mt-0.5">{aiInsight.ppc_strategy.breakeven_with_ads}</p>
+                </div>
+              )}
             </div>
           )}
 
