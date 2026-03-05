@@ -41,4 +41,6 @@ async def update_profile(profile: UserProfile):
         {"$set": data},
         upsert=True,
     )
+    # Invalidate AI insights cache so next analysis uses updated profile
+    await _database.db.ai_insights.delete_many({})
     return UserProfileResponse(**data)

@@ -251,6 +251,250 @@ IMPORTANTE: Hay nichos donde la Fase 1 NO funciona porque los compradores SOLO c
 
         return "\n\n".join(sections)
 
+    def _build_model_instructions(self, profile) -> str:
+        """Build IMPORTANTE instructions adapted to user's business model."""
+        model = profile.business_model
+        product_type = profile.product_type
+
+        lines = []
+        if model == "generic_only":
+            lines.append("- Evalúa si este nicho permite revender con marca del proveedor chino.")
+            lines.append("- Calcula costos usando el packaging existente del proveedor (sin customización).")
+            lines.append("- Evalúa el riesgo de competencia por Buy Box (¿cuántos vendedores podrían vender lo mismo?).")
+        elif model == "brand_only":
+            lines.append("- Evalúa este nicho para MARCA PROPIA (private label) desde el inicio.")
+            lines.append("- Calcula costos incluyendo packaging personalizado, trademark USPTO, y Brand Registry.")
+            lines.append("- Evalúa diferenciación de producto, A+ Content, y protección de listing.")
+            lines.append("- NO evalúes reventa con marca del proveedor chino — el cliente solo quiere marca propia.")
+        else:  # generic_then_brand
+            lines.append("- Evalúa si este nicho permite revender con marca del proveedor chino (Fase 1).")
+            lines.append("- Calcula costos usando el packaging existente del proveedor (sin customización).")
+            lines.append("- Indica claramente si este nicho REQUIERE marca propia desde el inicio.")
+            lines.append("- Evalúa el riesgo de competencia por Buy Box (¿cuántos vendedores podrían vender lo mismo?).")
+
+        if product_type == "consumable_only":
+            lines.append("- Si es consumible: calcula frecuencia de recompra, lifetime value, potencial Subscribe & Save.")
+            lines.append("- Si el nicho NO es consumible, indica que es NO-GO para este cliente y sugiere alternativas consumibles.")
+        elif product_type == "non_consumable_only":
+            lines.append("- Enfócate en margen por unidad, diferenciación de producto, y calidad.")
+            lines.append("- NO evalúes recompra ni LTV de consumibles.")
+        else:
+            lines.append("- Si es consumible: calcula frecuencia de recompra, lifetime value.")
+
+        return "\n".join(lines)
+
+    def _build_json_template(self, profile, b: int) -> str:
+        """Build JSON response template adapted to user's business model."""
+        model = profile.business_model
+
+        # Adapt veredicto example
+        if model == "brand_only":
+            veredicto_ej = "Viable con marca propia, márgenes del 45% tras inversión en branding y packaging diferenciado"
+        elif model == "generic_only":
+            veredicto_ej = "Viable con marca de proveedor chino, márgenes del 40% y bajo riesgo de Buy Box"
+        else:
+            veredicto_ej = "Viable en Fase 1 con marca del proveedor, transición a marca propia recomendada tras validar ventas"
+
+        # Adapt fase_recomendada
+        if model == "brand_only":
+            fase_block = f"""    "fase_recomendada": {{
+        "fase_actual": "marca_privada",
+        "requiere_marca_desde_inicio": true,
+        "razon_marca": "El cliente quiere crear marca propia — evalúa inversión en branding, packaging, USPTO, A+ Content",
+        "riesgo_buy_box": "N/A — con marca propia el listing es exclusivo",
+        "trigger_marca_privada": "Desde el inicio — inversión inicial en trademark y packaging",
+        "inversion_marca_privada": "$X,XXX estimado (USPTO trademark + Brand Registry + packaging personalizado + A+ Content)"
+    }}"""
+        elif model == "generic_only":
+            fase_block = f"""    "fase_recomendada": {{
+        "fase_actual": "marca_proveedor",
+        "requiere_marca_desde_inicio": false,
+        "razon_marca": "Evalúa si puede entrar revendiendo la marca del proveedor chino sin inversión en branding",
+        "riesgo_buy_box": "Evaluar riesgo de que otros vendedores se suban al mismo ASIN",
+        "trigger_marca_privada": "N/A — el cliente no planea crear marca propia",
+        "inversion_marca_privada": "N/A"
+    }}"""
+        else:
+            fase_block = f"""    "fase_recomendada": {{
+        "fase_actual": "marca_proveedor|marca_privada_necesaria",
+        "requiere_marca_desde_inicio": false,
+        "razon_marca": "Si puede entrar con marca del proveedor chino (y por qué), o si necesita marca propia desde el inicio",
+        "riesgo_buy_box": "Evaluar riesgo de que otros vendedores se suban al mismo ASIN",
+        "trigger_marca_privada": "Condición para pasar a Fase 2 (ej: 'Si superas 80 unidades/mes por 3 meses consecutivos')",
+        "inversion_marca_privada": "$X,XXX estimado (USPTO trademark + Brand Registry + packaging personalizado + A+ Content)"
+    }}"""
+
+        # Adapt estrategia_entrada
+        if model == "brand_only":
+            estrategia_razonamiento = "2-3 oraciones de por qué sí o no entrar con marca propia en este nicho"
+            estrategia_diferenciacion = "Cómo diferenciarse con marca propia (ej: 'Packaging premium, fórmula mejorada, A+ Content, Brand Store')"
+        elif model == "generic_only":
+            estrategia_razonamiento = "2-3 oraciones de por qué sí o no entrar revendiendo marca del proveedor chino"
+            estrategia_diferenciacion = "Cómo competir revendiendo marca del proveedor (ej: 'Mejor precio, envío Prime, listing optimizado')"
+        else:
+            estrategia_razonamiento = "2-3 oraciones de por qué sí o no entrar, comenzando con marca del proveedor chino"
+            estrategia_diferenciacion = "Cómo competir en Fase 1 y cómo diferenciarse en Fase 2 con marca propia"
+
+        # Adapt ideas_producto
+        if model == "brand_only":
+            idea_nombre = "Nombre del producto con tu marca propia"
+            idea_desc = "Qué buscar en Alibaba - producto para customizar con tu marca y packaging"
+            idea_costo = "$X.XX por unidad (FOB + packaging personalizado)"
+            idea_porque = "Por qué funcionaría con marca propia y diferenciación"
+            idea_packaging = "Diseño de packaging premium para tu marca"
+        elif model == "generic_only":
+            idea_nombre = "Nombre del tipo de producto a buscar con marca del proveedor"
+            idea_desc = "Qué buscar en Alibaba - producto con marca y packaging listo del proveedor"
+            idea_costo = "$X.XX por unidad (producto terminado con packaging del proveedor)"
+            idea_porque = "Por qué funcionaría revendiendo la marca del proveedor"
+            idea_packaging = "Descripción del packaging típico que ya ofrece el proveedor"
+        else:
+            idea_nombre = "Nombre del producto (empezar con marca del proveedor, luego marca propia)"
+            idea_desc = "Qué buscar en Alibaba - producto con marca lista del proveedor para Fase 1"
+            idea_costo = "$X.XX por unidad (producto terminado con packaging del proveedor)"
+            idea_porque = "Por qué funcionaría y cuándo pasar a marca propia"
+            idea_packaging = "Packaging del proveedor para Fase 1, diseño propio para Fase 2"
+
+        # Adapt sourcing
+        if model == "brand_only":
+            sourcing_tipo = "Tipo de fábrica/proveedor en Alibaba/1688 que acepte customización de marca y packaging"
+            sourcing_consejo = "Tip para negociar customización de marca, MOQ para packaging personalizado, y muestras"
+        else:
+            sourcing_tipo = "Tipo de fábrica/proveedor a buscar en Alibaba/1688 que ya tenga marca propia"
+            sourcing_consejo = "Tip para negociar con proveedores chinos que ya tienen su marca lista"
+
+        # Adapt financial description
+        if model == "brand_only":
+            costo_desc = "$X.XX (FOB China, producto + packaging personalizado de tu marca)"
+        else:
+            costo_desc = "$X.XX (FOB China, producto con packaging del proveedor listo)"
+
+        return f"""{{
+    "veredicto": "Una oración resumen (ej: '{veredicto_ej}')",
+    "score_label": "excelente|bueno|moderado|difícil|evitar",
+    "es_consumible": true,
+    "frecuencia_recompra_semanas": 4,
+    "go_no_go": {{
+        "decision": "GO|NO-GO|CAUTELA",
+        "margen_sin_marca": true,
+        "margen_mayor_30": true,
+        "reviews_mediana_menor_300": true,
+        "mercado_no_saturado": true,
+        "precio_en_rango_fba": true,
+        "sin_certificaciones_complejas": true,
+        "entrada_generica_viable": true,
+        "viable_con_ppc": true,
+        "vmv_alcanzable": true,
+        "resumen": "5-8 oraciones con RAZONAMIENTO por escenarios: ESCENARIO A (entrada directa): viable/no viable y por qué. ESCENARIO B (sub-nicho): qué variación específica podría funcionar. ESCENARIO C (formato diferente): qué formato alternativo tiene menos competencia. Para cada escenario incluye: VMV necesario, capital mínimo, probabilidad de éxito. Si el nicho es genuinamente cerrado en TODOS los escenarios, explica qué datos concretos lo prueban (ej: '0 productos con <500 reviews = 0 nuevos entrantes exitosos'). Si hay algún ángulo viable, recomiéndalo."
+    }},
+{fase_block},
+    "estrategia_entrada": {{
+        "recomendado": true,
+        "razonamiento": "{estrategia_razonamiento}",
+        "angulo_diferenciacion": "{estrategia_diferenciacion}",
+        "precio_objetivo": "$XX.XX - razón del precio",
+        "rating_objetivo": "4.5+ estrellas - cómo lograrlo"
+    }},
+    "volumen_minimo_viable": {{
+        "unidades_mes_breakeven": "XX unidades/mes mínimo para cubrir costos y ser rentable",
+        "porcentaje_mercado_necesario": "0.0X% del mercado total — muy alcanzable|alcanzable|difícil",
+        "ventas_estimadas_posicion_50": "XX-XX unidades/mes (estimación realista para un vendedor en posición 50-100)",
+        "ventas_estimadas_posicion_20": "XX-XX unidades/mes (estimación para posición 20-50)",
+        "ingreso_mensual_realista": "$X,XXX - $X,XXX/mes (basado en posición 50-100)",
+        "vmv_alcanzable": true,
+        "razonamiento_vmv": "2-3 oraciones explicando por qué el VMV es o no es alcanzable. Incluye el tamaño del mercado, la posición realista, y las unidades esperadas."
+    }},
+    "evaluacion_fba": {{
+        "porcentaje_competidores_prime": "XX% de los productos actuales tienen Prime",
+        "oportunidad_fba": "alta|media|baja — qué tan ventajoso es usar FBA en este nicho",
+        "ventaja_buy_box": "Descripción de la ventaja FBA para ganar Buy Box en este nicho",
+        "impacto_conversion": "Estimación de cómo Prime badge mejora conversión (típicamente +20-30%)",
+        "competidores_fbm": "X de Y competidores son FBM — esto es una oportunidad porque..."
+    }},
+    "analisis_financiero": {{
+        "costo_unitario_china": "{costo_desc}",
+        "costo_envio_unidad": "$X.XX (envío marítimo + customs por unidad para MOQ típico)",
+        "costo_amazon_fba": "$X.XX (FBA pick&pack + storage estimado)",
+        "amazon_referral_fee": "$X.XX (15% del precio de venta típico)",
+        "costo_total_por_unidad": "$X.XX",
+        "precio_venta_sugerido": "$XX.XX",
+        "margen_neto_unidad": "$X.XX",
+        "margen_porcentaje": "XX%",
+        "unidades_con_10k": "XXX unidades (primer pedido con ${b:,})",
+        "moq_china": "XXX unidades (mínimo típico del proveedor)",
+        "breakeven_unidades": "XXX unidades para recuperar inversión",
+        "roi_6_meses": "XX% (asumiendo ventas en posición 50-100, NO asumiendo ser top 10)",
+        "roi_12_meses": "XX%",
+        "ltv_cliente_anual": "$XXX (precio × compras al año si es consumible)"
+    }},
+    "ideas_producto": [
+        {{
+            "nombre": "{idea_nombre}",
+            "descripcion": "{idea_desc}",
+            "precio_estimado": "$XX.XX",
+            "costo_china_estimado": "{idea_costo}",
+            "margen": "XX%",
+            "porque": "{idea_porque}",
+            "packaging": "{idea_packaging}",
+            "tamano_sugerido": "Tamaño/contenido ideal (ej: 32oz, 60 cápsulas, etc)",
+            "subscribe_save": true,
+            "dificultad": "fácil|medio|difícil"
+        }}
+    ],
+    "riesgos": [
+        {{
+            "riesgo": "Descripción del riesgo",
+            "severidad": "alto|medio|bajo",
+            "mitigacion": "Cómo mitigarlo"
+        }}
+    ],
+    "sourcing_china": {{
+        "tipo_proveedor": "{sourcing_tipo}",
+        "palabras_clave_alibaba": ["keyword1", "keyword2"],
+        "certificaciones_necesarias": ["FDA", "EPA", "etc. según categoría"],
+        "tiempo_produccion_dias": 15,
+        "consejo_negociacion": "{sourcing_consejo}"
+    }},
+    "estrategia_ppc": {{
+        "viable_con_ppc": true,
+        "razonamiento_ppc": "3-4 oraciones explicando POR QUÉ PPC funciona o no para este nicho. Analiza: ¿los keywords principales están dominados por marcas con presupuestos enormes? ¿Hay keywords long-tail con menos competencia? ¿El precio del producto permite absorber el costo de ads y mantener margen?",
+        "cpc_estimado": "$0.80 - $1.50 (estimación basada en competitividad del nicho y precio promedio)",
+        "acos_objetivo": "25-35% (objetivo realista considerando márgenes)",
+        "presupuesto_mensual_ads": "$300 - $800 (recomendado para primeros 3 meses)",
+        "presupuesto_diario_sugerido": "$10 - $25",
+        "keywords_long_tail": [
+            "keyword long-tail 1 con menor competencia",
+            "keyword long-tail 2 específica",
+            "keyword long-tail 3 de nicho"
+        ],
+        "estrategia_lanzamiento": "Descripción de estrategia PPC para los primeros 30-60-90 días: qué tipo de campañas (auto/manual), cómo escalar, cuándo optimizar",
+        "riesgo_sin_ads": "Qué pasa si NO se usan ads — ¿es posible rankear orgánicamente o es imposible sin PPC?",
+        "breakeven_con_ads": "Cuántas unidades/mes necesitas vender con PPC para ser rentable considerando el costo de ads"
+    }},
+    "ventajas_competitivas": [
+        "Ventaja 1",
+        "Ventaja 2"
+    ],
+    "insights_mercado": [
+        "Insight clave del mercado 1",
+        "Insight clave del mercado 2"
+    ],
+    "sub_nichos": [
+        {{
+            "keyword_amazon": "keyword específica para buscar en Amazon (ej: 'grain free dog food small breed')",
+            "keyword_alibaba": "keyword para buscar proveedor en Alibaba/1688",
+            "competencia_estimada": "baja|media|alta",
+            "porque_viable": "Por qué este sub-nicho puede funcionar con ${b:,}",
+            "precio_estimado_rango": "$XX - $XX"
+        }}
+    ],
+    "proximos_pasos": [
+        "Paso concreto 1",
+        "Paso concreto 2",
+        "Paso concreto 3"
+    ]
+}}"""
+
     async def analyze_niche_ai(self, analysis_id: int, budget: int | None = None, db_ref=None) -> dict:
         analysis_resp = await analyzer.get_analysis_by_id(analysis_id)
         if not analysis_resp:
@@ -334,149 +578,14 @@ Analiza estos datos de Amazon US y da inteligencia accionable:
 {context}
 
 IMPORTANTE:
-- Evalúa si este nicho permite revender con marca del proveedor chino (Fase 1).
-- Calcula costos usando el packaging existente del proveedor (sin customización).
-- Indica claramente si este nicho REQUIERE marca propia desde el inicio.
-- Evalúa el riesgo de competencia por Buy Box (¿cuántos vendedores podrían vender lo mismo?).
-- Si es consumible: calcula frecuencia de recompra, lifetime value.
+{self._build_model_instructions(profile)}
 - CALCULA EL VMV: unidades mínimas/mes para breakeven, y evalúa si es realista para un vendedor nuevo con FBA.
 - EVALÚA VENTAJA FBA: % de competidores actuales con Prime, oportunidad de diferenciarse con FBA, impacto en Buy Box y conversión.
 - IMPORTANTE AMAZON PPC: Analiza la viabilidad de usar Amazon Sponsored Products para entrar al nicho. Estima CPC, ACOS, y presupuesto mensual recomendado. Evalúa si PPC hace viable un nicho que orgánicamente parece difícil. Identifica keywords long-tail que podrían tener CPC bajo.
 - IMPORTANTE SUB-NICHOS: Analiza la keyword buscada. Si es un término GENÉRICO/AMPLIO (ej: "dog food", "laundry detergent", "vitamins"), identifica 3-5 sub-nichos más específicos DENTRO de esa misma categoría que podrían ser más viables. Los sub-nichos deben ser keywords reales que alguien buscaría en Amazon (ej: para "dog food" → "grain free dog food small breed", "dog food toppers", "freeze dried dog food", "dog probiotics powder"). Incluye estimación de competencia y viabilidad para cada sub-nicho. Si la keyword ya es específica (ej: "organic dog dental chews"), puedes indicar 0 sub-nichos.
 
 Responde SOLO con JSON válido (sin markdown, sin ```):
-{{
-    "veredicto": "Una oración resumen (ej: 'Viable con marca de proveedor chino, márgenes del 40% y bajo riesgo de Buy Box')",
-    "score_label": "excelente|bueno|moderado|difícil|evitar",
-    "es_consumible": true,
-    "frecuencia_recompra_semanas": 4,
-    "go_no_go": {{
-        "decision": "GO|NO-GO|CAUTELA",
-        "margen_sin_marca": true,
-        "margen_mayor_30": true,
-        "reviews_mediana_menor_300": true,
-        "mercado_no_saturado": true,
-        "precio_en_rango_fba": true,
-        "sin_certificaciones_complejas": true,
-        "entrada_generica_viable": true,
-        "viable_con_ppc": true,
-        "vmv_alcanzable": true,
-        "resumen": "5-8 oraciones con RAZONAMIENTO por escenarios: ESCENARIO A (entrada directa): viable/no viable y por qué. ESCENARIO B (sub-nicho): qué variación específica podría funcionar. ESCENARIO C (formato diferente): qué formato alternativo tiene menos competencia. Para cada escenario incluye: VMV necesario, capital mínimo, probabilidad de éxito. Si el nicho es genuinamente cerrado en TODOS los escenarios, explica qué datos concretos lo prueban (ej: '0 productos con <500 reviews = 0 nuevos entrantes exitosos'). Si hay algún ángulo viable, recomiéndalo."
-    }},
-    "fase_recomendada": {{
-        "fase_actual": "marca_proveedor|marca_privada_necesaria",
-        "requiere_marca_desde_inicio": false,
-        "razon_marca": "Si puede entrar con marca del proveedor chino (y por qué), o si necesita marca propia desde el inicio",
-        "riesgo_buy_box": "Evaluar riesgo de que otros vendedores se suban al mismo ASIN",
-        "trigger_marca_privada": "Condición para pasar a Fase 2 (ej: 'Si superas 80 unidades/mes por 3 meses consecutivos')",
-        "inversion_marca_privada": "$X,XXX estimado (USPTO trademark + Brand Registry + packaging personalizado + A+ Content)"
-    }},
-    "estrategia_entrada": {{
-        "recomendado": true,
-        "razonamiento": "2-3 oraciones de por qué sí o no entrar con marca del proveedor chino",
-        "angulo_diferenciacion": "Cómo competir revendiendo marca del proveedor (ej: 'Mejor precio, envío Prime, listing optimizado en inglés')",
-        "precio_objetivo": "$XX.XX - razón del precio",
-        "rating_objetivo": "4.5+ estrellas - cómo lograrlo"
-    }},
-    "volumen_minimo_viable": {{
-        "unidades_mes_breakeven": "XX unidades/mes mínimo para cubrir costos y ser rentable",
-        "porcentaje_mercado_necesario": "0.0X% del mercado total — muy alcanzable|alcanzable|difícil",
-        "ventas_estimadas_posicion_50": "XX-XX unidades/mes (estimación realista para un vendedor en posición 50-100)",
-        "ventas_estimadas_posicion_20": "XX-XX unidades/mes (estimación para posición 20-50)",
-        "ingreso_mensual_realista": "$X,XXX - $X,XXX/mes (basado en posición 50-100)",
-        "vmv_alcanzable": true,
-        "razonamiento_vmv": "2-3 oraciones explicando por qué el VMV es o no es alcanzable. Incluye el tamaño del mercado, la posición realista, y las unidades esperadas."
-    }},
-    "evaluacion_fba": {{
-        "porcentaje_competidores_prime": "XX% de los productos actuales tienen Prime",
-        "oportunidad_fba": "alta|media|baja — qué tan ventajoso es usar FBA en este nicho",
-        "ventaja_buy_box": "Descripción de la ventaja FBA para ganar Buy Box en este nicho",
-        "impacto_conversion": "Estimación de cómo Prime badge mejora conversión (típicamente +20-30%)",
-        "competidores_fbm": "X de Y competidores son FBM — esto es una oportunidad porque..."
-    }},
-    "analisis_financiero": {{
-        "costo_unitario_china": "$X.XX (FOB China, producto con packaging del proveedor listo)",
-        "costo_envio_unidad": "$X.XX (envío marítimo + customs por unidad para MOQ típico)",
-        "costo_amazon_fba": "$X.XX (FBA pick&pack + storage estimado)",
-        "amazon_referral_fee": "$X.XX (15% del precio de venta típico)",
-        "costo_total_por_unidad": "$X.XX",
-        "precio_venta_sugerido": "$XX.XX",
-        "margen_neto_unidad": "$X.XX",
-        "margen_porcentaje": "XX%",
-        "unidades_con_10k": "XXX unidades (primer pedido con ${b:,})",
-        "moq_china": "XXX unidades (mínimo típico del proveedor)",
-        "breakeven_unidades": "XXX unidades para recuperar inversión",
-        "roi_6_meses": "XX% (asumiendo ventas en posición 50-100, NO asumiendo ser top 10)",
-        "roi_12_meses": "XX%",
-        "ltv_cliente_anual": "$XXX (precio × compras al año si es consumible)"
-    }},
-    "ideas_producto": [
-        {{
-            "nombre": "Nombre del tipo de producto a buscar con marca del proveedor",
-            "descripcion": "Qué buscar en Alibaba - producto con marca y packaging listo del proveedor",
-            "precio_estimado": "$XX.XX",
-            "costo_china_estimado": "$X.XX por unidad (producto terminado con packaging del proveedor)",
-            "margen": "XX%",
-            "porque": "Por qué funcionaría revendiendo la marca del proveedor",
-            "packaging": "Descripción del packaging típico que ya ofrece el proveedor",
-            "tamano_sugerido": "Tamaño/contenido ideal (ej: 32oz, 60 cápsulas, etc)",
-            "subscribe_save": true,
-            "dificultad": "fácil|medio|difícil"
-        }}
-    ],
-    "riesgos": [
-        {{
-            "riesgo": "Descripción del riesgo",
-            "severidad": "alto|medio|bajo",
-            "mitigacion": "Cómo mitigarlo"
-        }}
-    ],
-    "sourcing_china": {{
-        "tipo_proveedor": "Tipo de fábrica/proveedor a buscar en Alibaba/1688 que ya tenga marca propia",
-        "palabras_clave_alibaba": ["keyword1", "keyword2"],
-        "certificaciones_necesarias": ["FDA", "EPA", etc. según categoría],
-        "tiempo_produccion_dias": 15,
-        "consejo_negociacion": "Tip para negociar con proveedores chinos que ya tienen su marca lista"
-    }},
-    "estrategia_ppc": {{
-        "viable_con_ppc": true,
-        "razonamiento_ppc": "3-4 oraciones explicando POR QUÉ PPC funciona o no para este nicho. Analiza: ¿los keywords principales están dominados por marcas con presupuestos enormes? ¿Hay keywords long-tail con menos competencia? ¿El precio del producto permite absorber el costo de ads y mantener margen?",
-        "cpc_estimado": "$0.80 - $1.50 (estimación basada en competitividad del nicho y precio promedio)",
-        "acos_objetivo": "25-35% (objetivo realista considerando márgenes)",
-        "presupuesto_mensual_ads": "$300 - $800 (recomendado para primeros 3 meses)",
-        "presupuesto_diario_sugerido": "$10 - $25",
-        "keywords_long_tail": [
-            "keyword long-tail 1 con menor competencia",
-            "keyword long-tail 2 específica",
-            "keyword long-tail 3 de nicho"
-        ],
-        "estrategia_lanzamiento": "Descripción de estrategia PPC para los primeros 30-60-90 días: qué tipo de campañas (auto/manual), cómo escalar, cuándo optimizar",
-        "riesgo_sin_ads": "Qué pasa si NO se usan ads — ¿es posible rankear orgánicamente o es imposible sin PPC?",
-        "breakeven_con_ads": "Cuántas unidades/mes necesitas vender con PPC para ser rentable considerando el costo de ads"
-    }},
-    "ventajas_competitivas": [
-        "Ventaja 1 con este modelo de reventa",
-        "Ventaja 2"
-    ],
-    "insights_mercado": [
-        "Insight clave del mercado 1",
-        "Insight clave del mercado 2"
-    ],
-    "sub_nichos": [
-        {{
-            "keyword_amazon": "keyword específica para buscar en Amazon (ej: 'grain free dog food small breed')",
-            "keyword_alibaba": "keyword para buscar proveedor en Alibaba/1688",
-            "competencia_estimada": "baja|media|alta",
-            "porque_viable": "Por qué este sub-nicho puede funcionar con ${b:,}",
-            "precio_estimado_rango": "$XX - $XX"
-        }}
-    ],
-    "proximos_pasos": [
-        "Paso concreto 1 (buscar proveedor con marca lista)",
-        "Paso concreto 2",
-        "Paso concreto 3"
-    ]
-}}"""
+{self._build_json_template(profile, b)}"""
 
         try:
             response = self.client.messages.create(
@@ -670,7 +779,8 @@ Responde SOLO con JSON válido (sin markdown, sin ```):
         }
 
     async def compare_niches(self, analysis_ids: list[int], budget: int | None = None, db_ref=None) -> dict:
-        b = budget or DEFAULT_BUDGET
+        profile = await get_user_profile()
+        b = budget or profile.budget or DEFAULT_BUDGET
         analyses = []
         for aid in analysis_ids:
             resp = await analyzer.get_analysis_by_id(aid)
@@ -686,8 +796,11 @@ Responde SOLO con JSON válido (sin markdown, sin ```):
 
         all_context = "\n---\n".join(contexts)
 
+        profile_prompt = self._build_profile_prompt(profile, b)
+
         prompt = f"""Eres un experto estratega de Amazon Private Label. RESPONDE TODO EN ESPAÑOL.
-Tu cliente tiene ${b:,} USD y busca productos consumibles (recompra recurrente).
+
+{profile_prompt}
 
 Compara estos nichos y dime cuál es mejor para empezar:
 
@@ -765,15 +878,22 @@ Responde SOLO con JSON válido (sin markdown):
         if not analysis_resp:
             raise ValueError("Analysis not found")
 
-        b = budget or DEFAULT_BUDGET
+        profile = await get_user_profile()
+        b = budget or profile.budget or DEFAULT_BUDGET
         analysis_data = analysis_resp.model_dump()
         context = self._build_analysis_context(analysis_data, budget=b)
+
+        product_type_label = {
+            "consumable_only": "consumibles (recompra recurrente)",
+            "non_consumable_only": "no-consumibles (duraderos)",
+            "any": "cualquier tipo (consumibles y no-consumibles)",
+        }.get(profile.product_type, "consumibles")
 
         prompt = f"""Eres un experto en desarrollo de productos Private Label para Amazon y sourcing desde China.
 RESPONDE TODO EN ESPAÑOL.
 Tu cliente tiene ${b:,} USD para invertir.
 
-Basado en estos datos, genera 5 ideas ESPECÍFICAS de productos consumibles:
+Basado en estos datos, genera 5 ideas ESPECÍFICAS de productos {product_type_label}:
 
 {context}
 

@@ -33,6 +33,7 @@ import {
   getAIAnalysis,
   compareNiches,
   aiChat,
+  getUserProfile,
 } from "@/lib/api";
 import type {
   AnalysisHistoryItem,
@@ -110,8 +111,14 @@ export default function AdvisorPage() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    getAnalysisHistory()
-      .then((d) => setAnalyses(d.analyses))
+    Promise.all([
+      getAnalysisHistory(),
+      getUserProfile().catch(() => null),
+    ])
+      .then(([d, profile]) => {
+        setAnalyses(d.analyses);
+        if (profile?.budget) setBudget(profile.budget);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
