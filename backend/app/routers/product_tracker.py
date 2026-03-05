@@ -10,6 +10,25 @@ router = APIRouter(prefix="/api/tracked-products", tags=["product-tracker"])
 
 def _doc_to_response(doc: dict) -> TrackedProductResponse:
     d = {k: v for k, v in doc.items() if k != "_id"}
+    # Migrate old variation format: values were raw dicts or strings, now VariationValue
+    if d.get("variations"):
+        fixed_vars = []
+        for var in d["variations"]:
+            if isinstance(var, dict) and "values" in var:
+                fixed_values = []
+                for v in var["values"]:
+                    if isinstance(v, str):
+                        fixed_values.append({"value": v, "asin": None, "is_selected": False})
+                    elif isinstance(v, dict) and "value" not in v:
+                        # Old format: {'asin': '...', 'is_selected': True} without 'value' key
+                        label = v.get("name") or v.get("asin") or "?"
+                        fixed_values.append({"value": label, "asin": v.get("asin"), "is_selected": v.get("is_selected", False)})
+                    else:
+                        fixed_values.append(v)
+                fixed_vars.append({"name": var.get("name", ""), "values": fixed_values})
+            else:
+                fixed_vars.append(var)
+        d["variations"] = fixed_vars
     return TrackedProductResponse(**d)
 
 

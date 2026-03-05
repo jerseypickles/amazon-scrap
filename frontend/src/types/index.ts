@@ -367,9 +367,15 @@ export interface ProductReview {
   author: string | null;
 }
 
+export interface VariationValue {
+  value: string;
+  asin: string | null;
+  is_selected: boolean;
+}
+
 export interface ProductVariation {
   name: string;
-  values: string[];
+  values: VariationValue[];
 }
 
 export interface OfferItem {

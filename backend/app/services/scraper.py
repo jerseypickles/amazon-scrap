@@ -259,7 +259,18 @@ class AmazonScraper:
         if isinstance(customs, dict):
             for option_name, option_values in customs.items():
                 if isinstance(option_values, list):
-                    variations.append({"name": option_name, "values": option_values[:20]})
+                    parsed_values: list[dict] = []
+                    for ov in option_values[:20]:
+                        if isinstance(ov, dict):
+                            parsed_values.append({
+                                "value": ov.get("value") or ov.get("name") or str(ov.get("asin", "")),
+                                "asin": ov.get("asin"),
+                                "is_selected": ov.get("is_selected", False),
+                            })
+                        elif isinstance(ov, str):
+                            parsed_values.append({"value": ov, "asin": None, "is_selected": False})
+                    if parsed_values:
+                        variations.append({"name": option_name, "values": parsed_values})
 
         # Top reviews from product page
         top_reviews: list[dict] = []

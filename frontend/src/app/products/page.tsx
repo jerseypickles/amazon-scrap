@@ -425,8 +425,16 @@ function DetailPanel({ product, onClose }: { product: TrackedProduct; onClose: (
                   <p className="text-[10px] font-bold mb-1" style={{ color: "var(--text-secondary)" }}>{v.name}</p>
                   <div className="flex flex-wrap gap-1">
                     {v.values.map((val, j) => (
-                      <span key={j} className="text-[9px] px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.06)", color: "var(--text-secondary)" }}>
-                        {val}
+                      <span
+                        key={j}
+                        className="text-[9px] px-2 py-0.5 rounded-full"
+                        style={{
+                          background: val.is_selected ? "rgba(249,115,22,0.15)" : "rgba(255,255,255,0.06)",
+                          color: val.is_selected ? "#f97316" : "var(--text-secondary)",
+                          fontWeight: val.is_selected ? 700 : 400,
+                        }}
+                      >
+                        {val.value}
                       </span>
                     ))}
                   </div>

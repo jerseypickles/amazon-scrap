@@ -70,9 +70,15 @@ class ProductReview(BaseModel):
     author: str | None = None
 
 
+class VariationValue(BaseModel):
+    value: str
+    asin: str | None = None
+    is_selected: bool = False
+
+
 class ProductVariation(BaseModel):
     name: str
-    values: list[str] = []
+    values: list[VariationValue] = []
 
 
 class OfferItem(BaseModel):
