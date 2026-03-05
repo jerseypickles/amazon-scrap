@@ -164,6 +164,15 @@ class NicheAnalyzer:
         median_reviews_val = round(statistics.median(reviews), 1) if reviews else None
         prime_pct = round(sum(1 for p in raw_products if p.get("is_prime")) / n * 100, 1) if n else None
         bought_pct = round(sum(1 for p in raw_products if p.get("monthly_bought")) / n * 100, 1) if n else None
+        best_seller_pct = round(sum(1 for p in raw_products if p.get("is_best_seller")) / n * 100, 1) if n else None
+        amazon_choice_pct = round(sum(1 for p in raw_products if p.get("is_amazon_choice")) / n * 100, 1) if n else None
+
+        # Estimated margin (standalone metric from price analysis)
+        estimated_margin = None
+        if median_price and median_price > 0:
+            ref = median_price
+            cost = (ref * 0.15) + 3.50 + (ref * 0.25) + 1.50  # referral + FBA + sourcing + inbound
+            estimated_margin = round(((ref - cost) / ref) * 100, 1)
 
         # Market saturation analysis
         saturation = self._calc_saturation(reviews)
@@ -193,6 +202,9 @@ class NicheAnalyzer:
             median_reviews=median_reviews_val,
             prime_percentage=prime_pct,
             monthly_bought_percentage=bought_pct,
+            best_seller_percentage=best_seller_pct,
+            amazon_choice_percentage=amazon_choice_pct,
+            estimated_margin=estimated_margin,
             search_result_count=search_result_count or None,
             demand_breakdown=demand_bd,
             competition_breakdown=competition_bd,
@@ -967,6 +979,9 @@ class NicheAnalyzer:
             median_reviews=a.get("median_reviews"),
             prime_percentage=a.get("prime_percentage"),
             monthly_bought_percentage=a.get("monthly_bought_percentage"),
+            best_seller_percentage=a.get("best_seller_percentage"),
+            amazon_choice_percentage=a.get("amazon_choice_percentage"),
+            estimated_margin=a.get("estimated_margin"),
             search_result_count=a.get("search_result_count"),
             demand_breakdown=a.get("demand_breakdown") or [],
             competition_breakdown=a.get("competition_breakdown") or [],

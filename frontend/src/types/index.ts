@@ -94,6 +94,9 @@ export interface NicheAnalysis {
   median_reviews: number | null;
   prime_percentage: number | null;
   monthly_bought_percentage: number | null;
+  best_seller_percentage: number | null;
+  amazon_choice_percentage: number | null;
+  estimated_margin: number | null;
   search_result_count: number | null;
   demand_breakdown: ScoreBreakdown[];
   competition_breakdown: ScoreBreakdown[];

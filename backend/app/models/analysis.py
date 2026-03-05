@@ -27,6 +27,19 @@ def new_analysis_doc(id: int, **fields) -> dict:
         "price_score": fields.get("price_score"),
         "quality_gap_score": fields.get("quality_gap_score"),
         "revenue_estimate": fields.get("revenue_estimate"),
+        "median_reviews": fields.get("median_reviews"),
+        "prime_percentage": fields.get("prime_percentage"),
+        "monthly_bought_percentage": fields.get("monthly_bought_percentage"),
+        "best_seller_percentage": fields.get("best_seller_percentage"),
+        "amazon_choice_percentage": fields.get("amazon_choice_percentage"),
+        "estimated_margin": fields.get("estimated_margin"),
+        "search_result_count": fields.get("search_result_count"),
+        "demand_breakdown": fields.get("demand_breakdown"),
+        "competition_breakdown": fields.get("competition_breakdown"),
+        "price_breakdown": fields.get("price_breakdown"),
+        "quality_breakdown": fields.get("quality_breakdown"),
+        "saturation": fields.get("saturation"),
+        "price_opportunity": fields.get("price_opportunity"),
         "price_distribution": fields.get("price_distribution"),  # list of dicts
         "rating_distribution": fields.get("rating_distribution"),  # list of dicts
         "review_distribution": fields.get("review_distribution"),  # list of dicts

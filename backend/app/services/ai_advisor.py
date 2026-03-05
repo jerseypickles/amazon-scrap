@@ -48,6 +48,9 @@ REVIEWS Y RATINGS:
 MÉTRICAS EXTENDIDAS:
 - % Productos Prime: {analysis_data.get('prime_percentage', 'N/A')}%
 - % Productos con "Monthly Bought": {analysis_data.get('monthly_bought_percentage', 'N/A')}%
+- % Best Sellers: {analysis_data.get('best_seller_percentage', 'N/A')}%
+- % Amazon's Choice: {analysis_data.get('amazon_choice_percentage', 'N/A')}%
+- Margen Neto Estimado: {analysis_data.get('estimated_margin', 'N/A')}% (basado en precio mediano, 15% referral, $3.50 FBA, 25% sourcing, $1.50 inbound)
 - Resultados Totales en Amazon: {analysis_data.get('search_result_count') or 'N/A'}
 
 COMPETENCIA:

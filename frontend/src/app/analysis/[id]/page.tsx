@@ -399,8 +399,8 @@ export default function AnalysisDetailPage() {
                 <span><span style={{ color: "var(--text-muted)" }}>Precio:</span> <strong style={{ color: "#f59e0b" }}>{analysis.avg_price ? `$${analysis.avg_price.toFixed(2)}` : "--"}</strong></span>
                 <span><span style={{ color: "var(--text-muted)" }}>Reviews Med:</span> <strong style={{ color: "#6366f1" }}>{analysis.median_reviews?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? "--"}</strong></span>
                 <span><span style={{ color: "var(--text-muted)" }}>Prime:</span> <strong style={{ color: "#10b981" }}>{analysis.prime_percentage != null ? `${analysis.prime_percentage}%` : "--"}</strong></span>
-                {aiInsight?.cost_estimate?.margin_range && (
-                  <span><span style={{ color: "var(--text-muted)" }}>Margen:</span> <strong style={{ color: "#10b981" }}>{aiInsight.cost_estimate.margin_range}</strong></span>
+                {analysis.estimated_margin != null && (
+                  <span><span style={{ color: "var(--text-muted)" }}>Margen:</span> <strong style={{ color: analysis.estimated_margin >= 30 ? "#10b981" : analysis.estimated_margin >= 20 ? "#f59e0b" : "#ef4444" }}>~{analysis.estimated_margin}%</strong></span>
                 )}
               </div>
             </div>
@@ -653,13 +653,16 @@ export default function AnalysisDetailPage() {
           </div>
 
           {/* Extended metrics */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { l: "Ingreso Est/Mes", v: analysis.revenue_estimate ? `$${Math.round(analysis.revenue_estimate).toLocaleString()}` : "--", c: "#10b981" },
+              { l: "Margen Estimado", v: analysis.estimated_margin != null ? `${analysis.estimated_margin}%` : "--", c: analysis.estimated_margin != null && analysis.estimated_margin >= 30 ? "#10b981" : analysis.estimated_margin != null && analysis.estimated_margin >= 20 ? "#f59e0b" : "#ef4444" },
               { l: "Reviews Mediana", v: analysis.median_reviews?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? "--", c: "#6366f1" },
-              { l: "BSR Promedio", v: analysis.avg_bsr ? Math.round(analysis.avg_bsr).toLocaleString() : "--", c: "#f59e0b" },
-              { l: "% Con Ventas", v: analysis.monthly_bought_percentage != null ? `${analysis.monthly_bought_percentage}%` : "--", c: "#f97316" },
               { l: "Rango Precio", v: `$${analysis.min_price?.toFixed(0) ?? "?"} - $${analysis.max_price?.toFixed(0) ?? "?"}`, c: "var(--text-primary)" },
+              { l: "% Con Ventas", v: analysis.monthly_bought_percentage != null ? `${analysis.monthly_bought_percentage}%` : "--", c: "#f97316" },
+              { l: "% Best Seller", v: analysis.best_seller_percentage != null ? `${analysis.best_seller_percentage}%` : "--", c: "#f97316" },
+              { l: "% Amazon Choice", v: analysis.amazon_choice_percentage != null ? `${analysis.amazon_choice_percentage}%` : "--", c: "#10b981" },
+              { l: "Resultados Amazon", v: analysis.search_result_count ? analysis.search_result_count.toLocaleString() : "--", c: "var(--text-primary)" },
             ].map((m) => (
               <div key={m.l} className="p-3 rounded-xl" style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)" }}>
                 <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>{m.l}</p>
@@ -667,6 +670,61 @@ export default function AnalysisDetailPage() {
               </div>
             ))}
           </div>
+
+          {/* Top Brands Table */}
+          {analysis.top_brands && analysis.top_brands.length > 0 && (
+            <div className="card">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Users size={15} color="#6366f1" />
+                  <h3 className="text-sm font-bold">Top Marcas</h3>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(99,102,241,0.1)", color: "#6366f1" }}>{analysis.brand_count} marcas</span>
+                </div>
+                {analysis.top3_brand_share != null && (
+                  <span className="text-[10px] font-bold" style={{ color: analysis.top3_brand_share > 50 ? "#ef4444" : analysis.top3_brand_share > 35 ? "#f59e0b" : "#10b981" }}>
+                    Top 3: {analysis.top3_brand_share.toFixed(1)}% del mercado
+                  </span>
+                )}
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead><tr>
+                    <th>Marca</th>
+                    <th style={{ textAlign: "right" }}>Productos</th>
+                    <th style={{ textAlign: "right" }}>Share</th>
+                    <th style={{ textAlign: "right" }}>Precio</th>
+                    <th style={{ textAlign: "right" }}>Rating</th>
+                    <th style={{ textAlign: "right" }}>Reviews</th>
+                    <th style={{ textAlign: "center" }}>Amenaza</th>
+                  </tr></thead>
+                  <tbody>
+                    {analysis.top_brands.map((brand) => (
+                      <tr key={brand.name}>
+                        <td>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold">{brand.name}</span>
+                            {brand.best_seller_count > 0 && <Award size={10} color="#f97316" />}
+                            {brand.amazon_choice_count > 0 && <BadgeCheck size={10} color="#10b981" />}
+                          </div>
+                        </td>
+                        <td style={{ textAlign: "right" }}>{brand.count}</td>
+                        <td style={{ textAlign: "right" }}>{brand.market_share.toFixed(1)}%</td>
+                        <td style={{ textAlign: "right" }}>{brand.avg_price != null ? `$${brand.avg_price.toFixed(2)}` : "--"}</td>
+                        <td style={{ textAlign: "right" }}>{brand.avg_rating?.toFixed(1) ?? "--"}</td>
+                        <td style={{ textAlign: "right" }}>{brand.total_reviews.toLocaleString()}</td>
+                        <td style={{ textAlign: "center" }}>
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded" style={{
+                            background: brand.threat_level === "high" ? "rgba(239,68,68,0.1)" : brand.threat_level === "medium" ? "rgba(245,158,11,0.1)" : "rgba(16,185,129,0.1)",
+                            color: brand.threat_level === "high" ? "#ef4444" : brand.threat_level === "medium" ? "#f59e0b" : "#10b981",
+                          }}>{brand.threat_level === "high" ? "Alta" : brand.threat_level === "medium" ? "Media" : "Baja"}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Score Breakdowns */}
           <div>
