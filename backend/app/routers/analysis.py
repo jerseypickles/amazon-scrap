@@ -49,6 +49,21 @@ async def get_dashboard():
     return await analyzer.get_dashboard_summary()
 
 
+@router.delete("/purge-all")
+async def purge_all_analyses():
+    """Delete ALL analyses, products, and AI cache. Use with caution."""
+    a = await _database.db.niche_analyses.delete_many({})
+    p = await _database.db.products.delete_many({})
+    ai = await _database.db.ai_analyses.delete_many({})
+    counters = await _database.db.counters.delete_many({"_id": {"$in": ["niche_analyses", "products"]}})
+    return {
+        "analyses_deleted": a.deleted_count,
+        "products_deleted": p.deleted_count,
+        "ai_cache_deleted": ai.deleted_count,
+        "counters_reset": counters.deleted_count,
+    }
+
+
 @router.post("/cleanup-duplicates")
 async def cleanup_duplicate_analyses():
     """Remove duplicate analyses, keeping only the most recent per keyword."""
