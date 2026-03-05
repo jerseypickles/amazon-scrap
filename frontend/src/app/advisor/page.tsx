@@ -10,17 +10,12 @@ import {
   AlertTriangle,
   Lightbulb,
   Target,
-  TrendingUp,
   Scale,
   RefreshCw,
   CheckCircle,
   XCircle,
   DollarSign,
-  Package,
-  Globe,
   Repeat,
-  Factory,
-  BarChart3,
   CircleCheck,
   CircleX,
   Layers,
@@ -585,16 +580,6 @@ export default function AdvisorPage() {
                   <p className="text-xs mb-2" style={{ color: "var(--text-secondary)" }}>
                     {insight.phase_recommendation.brand_reason}
                   </p>
-                  {insight.phase_recommendation.buy_box_risk && (
-                    <div className="mt-2 p-2 rounded-lg" style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.12)" }}>
-                      <p className="text-[10px] font-bold uppercase mb-0.5" style={{ color: "#f59e0b" }}>
-                        Riesgo Buy Box
-                      </p>
-                      <p className="text-[11px]" style={{ color: "var(--text-secondary)" }}>
-                        {insight.phase_recommendation.buy_box_risk}
-                      </p>
-                    </div>
-                  )}
                 </div>
 
                 {/* Phase 2 - Private Label */}
@@ -629,88 +614,28 @@ export default function AdvisorPage() {
             </div>
           )}
 
-          {/* Financial Analysis */}
-          {insight.financials && (
+          {/* Cost Estimate */}
+          {insight.cost_estimate && (
             <div className="card">
               <div className="flex items-center gap-3 mb-5">
                 <DollarSign size={18} color="#10b981" />
-                <h3 className="text-sm font-bold">An\u00e1lisis Financiero</h3>
+                <h3 className="text-sm font-bold">Estimaci\u00f3n de Costos</h3>
                 <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(16,185,129,0.1)", color: "#10b981" }}>
                   Presupuesto ${formatBudget(budget)}
                 </span>
               </div>
-
-              {/* Cost breakdown */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-                <div className="p-3 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
-                    Costo China (FOB)
-                  </p>
-                  <p className="text-lg font-bold mt-1" style={{ color: "#f59e0b" }}>{insight.financials.costo_unitario_china}</p>
-                </div>
-                <div className="p-3 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
-                    Env\u00edo + Customs
-                  </p>
-                  <p className="text-lg font-bold mt-1">{insight.financials.costo_envio_unidad}</p>
-                </div>
-                <div className="p-3 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
-                    Amazon FBA
-                  </p>
-                  <p className="text-lg font-bold mt-1">{insight.financials.costo_amazon_fba}</p>
-                </div>
-                <div className="p-3 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
-                    Referral Fee
-                  </p>
-                  <p className="text-lg font-bold mt-1">{insight.financials.amazon_referral_fee}</p>
-                </div>
-              </div>
-
-              {/* Profit metrics */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="p-3 rounded-xl" style={{ background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.15)" }}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#10b981" }}>
-                    Precio Venta
-                  </p>
-                  <p className="text-xl font-black mt-1" style={{ color: "#10b981" }}>{insight.financials.precio_venta_sugerido}</p>
-                </div>
-                <div className="p-3 rounded-xl" style={{ background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.15)" }}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#10b981" }}>
-                    Margen Neto
-                  </p>
-                  <p className="text-xl font-black mt-1" style={{ color: "#10b981" }}>{insight.financials.margen_neto_unidad}</p>
-                  <p className="text-[10px] font-semibold" style={{ color: "#10b981" }}>{insight.financials.margen_porcentaje}</p>
-                </div>
-                <div className="p-3 rounded-xl" style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)" }}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--accent)" }}>
-                    Unidades con ${formatBudget(budget)}
-                  </p>
-                  <p className="text-xl font-black mt-1" style={{ color: "var(--accent)" }}>{insight.financials.unidades_con_10k}</p>
-                  <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>MOQ: {insight.financials.moq_china}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#10b981" }}>Margen Estimado</p>
+                  <p className="text-xl font-black mt-1" style={{ color: "#10b981" }}>{insight.cost_estimate.margin_range}</p>
                 </div>
                 <div className="p-3 rounded-xl" style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)" }}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#f59e0b" }}>
-                    Break-even
-                  </p>
-                  <p className="text-xl font-black mt-1" style={{ color: "#f59e0b" }}>{insight.financials.breakeven_unidades}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#f59e0b" }}>Inversi\u00f3n M\u00ednima</p>
+                  <p className="text-xl font-black mt-1" style={{ color: "#f59e0b" }}>{insight.cost_estimate.min_investment}</p>
                 </div>
-              </div>
-
-              {/* ROI + LTV */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="p-3 rounded-lg text-center" style={{ background: "var(--bg-elevated)" }}>
-                  <p className="text-[10px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>ROI 6 Meses</p>
-                  <p className="text-lg font-bold mt-1" style={{ color: "var(--accent)" }}>{insight.financials.roi_6_meses}</p>
-                </div>
-                <div className="p-3 rounded-lg text-center" style={{ background: "var(--bg-elevated)" }}>
-                  <p className="text-[10px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>ROI 12 Meses</p>
-                  <p className="text-lg font-bold mt-1" style={{ color: "#10b981" }}>{insight.financials.roi_12_meses}</p>
-                </div>
-                <div className="p-3 rounded-lg text-center" style={{ background: "var(--bg-elevated)" }}>
-                  <p className="text-[10px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>LTV Cliente/A\u00f1o</p>
-                  <p className="text-lg font-bold mt-1" style={{ color: "#10b981" }}>{insight.financials.ltv_cliente_anual}</p>
+                <div className="p-3 rounded-xl" style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)" }}>
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--accent)" }}>Breakeven</p>
+                  <p className="text-xl font-black mt-1" style={{ color: "var(--accent)" }}>{insight.cost_estimate.breakeven_months}</p>
                 </div>
               </div>
             </div>
@@ -767,11 +692,6 @@ export default function AdvisorPage() {
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="font-semibold text-sm">{idea.name}</h4>
                         <div className="flex items-center gap-2">
-                          {idea.subscribe_save && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded font-bold" style={{ background: "rgba(99,102,241,0.1)", color: "var(--accent)" }}>
-                              S&amp;S
-                            </span>
-                          )}
                           {diff && (
                             <span className="text-[9px] px-1.5 py-0.5 rounded font-bold" style={{ background: diff.bg, color: diff.color }}>
                               {diff.label}
@@ -785,32 +705,14 @@ export default function AdvisorPage() {
                       <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
                         {idea.description}
                       </p>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
-                        {idea.china_cost && (
-                          <div className="p-2 rounded-lg" style={{ background: "rgba(0,0,0,0.2)" }}>
-                            <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Costo China</p>
-                            <p className="text-xs font-bold mt-0.5" style={{ color: "#f59e0b" }}>{idea.china_cost}</p>
-                          </div>
-                        )}
-                        {idea.target_margin && (
+                      {idea.target_margin && (
+                        <div className="flex gap-2 mt-3">
                           <div className="p-2 rounded-lg" style={{ background: "rgba(0,0,0,0.2)" }}>
                             <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Margen</p>
                             <p className="text-xs font-bold mt-0.5" style={{ color: "#10b981" }}>{idea.target_margin}</p>
                           </div>
-                        )}
-                        {idea.size_suggestion && (
-                          <div className="p-2 rounded-lg" style={{ background: "rgba(0,0,0,0.2)" }}>
-                            <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Tama\u00f1o</p>
-                            <p className="text-xs font-semibold mt-0.5">{idea.size_suggestion}</p>
-                          </div>
-                        )}
-                        {idea.packaging_idea && (
-                          <div className="p-2 rounded-lg" style={{ background: "rgba(0,0,0,0.2)" }}>
-                            <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Packaging</p>
-                            <p className="text-xs font-semibold mt-0.5">{idea.packaging_idea}</p>
-                          </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                       <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
                         {idea.why}
                       </p>
@@ -818,65 +720,6 @@ export default function AdvisorPage() {
                   );
                 })}
               </div>
-            </div>
-          )}
-
-          {/* Sourcing China */}
-          {insight.sourcing && (
-            <div className="card">
-              <div className="flex items-center gap-3 mb-4">
-                <Factory size={18} color="#f97316" />
-                <h3 className="text-sm font-bold">Sourcing China</h3>
-                <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "rgba(249,115,22,0.1)", color: "#f97316" }}>
-                  Alibaba / 1688
-                </span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-3 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
-                  <p className="text-[10px] font-bold uppercase mb-2" style={{ color: "var(--text-muted)" }}>
-                    Tipo de Proveedor
-                  </p>
-                  <p className="text-sm">{insight.sourcing.tipo_proveedor}</p>
-                </div>
-                <div className="p-3 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
-                  <p className="text-[10px] font-bold uppercase mb-2" style={{ color: "var(--text-muted)" }}>
-                    Tiempo Producci\u00f3n
-                  </p>
-                  <p className="text-sm">{insight.sourcing.tiempo_produccion_dias} d\u00edas</p>
-                </div>
-                <div className="p-3 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
-                  <p className="text-[10px] font-bold uppercase mb-2" style={{ color: "var(--text-muted)" }}>
-                    Keywords Alibaba
-                  </p>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {insight.sourcing.palabras_clave_alibaba.map((kw, i) => (
-                      <span key={i} className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "rgba(249,115,22,0.1)", color: "#f97316" }}>
-                        {kw}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div className="p-3 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
-                  <p className="text-[10px] font-bold uppercase mb-2" style={{ color: "var(--text-muted)" }}>
-                    Certificaciones
-                  </p>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {insight.sourcing.certificaciones_necesarias.map((cert, i) => (
-                      <span key={i} className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>
-                        {cert}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              {insight.sourcing.consejo_negociacion && (
-                <div className="mt-4 p-3 rounded-lg" style={{ background: "rgba(249,115,22,0.04)", border: "1px solid rgba(249,115,22,0.15)" }}>
-                  <p className="text-[10px] font-bold uppercase mb-1" style={{ color: "#f97316" }}>
-                    Consejo de Negociaci\u00f3n
-                  </p>
-                  <p className="text-xs" style={{ color: "var(--text-secondary)" }}>{insight.sourcing.consejo_negociacion}</p>
-                </div>
-              )}
             </div>
           )}
 
@@ -908,42 +751,6 @@ export default function AdvisorPage() {
               </div>
             </div>
           )}
-
-          {/* Market Insights + Advantages */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {insight.market_insights && insight.market_insights.length > 0 && (
-              <div className="card">
-                <div className="flex items-center gap-3 mb-4">
-                  <TrendingUp size={18} color="var(--info)" />
-                  <h3 className="text-sm font-bold">Insights del Mercado</h3>
-                </div>
-                <ul className="space-y-2">
-                  {insight.market_insights.map((m, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
-                      <span className="text-[10px] mt-1" style={{ color: "var(--info)" }}>&#9679;</span>
-                      {m}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {insight.competitive_advantages && insight.competitive_advantages.length > 0 && (
-              <div className="card">
-                <div className="flex items-center gap-3 mb-4">
-                  <ShieldCheck size={18} color="var(--success)" />
-                  <h3 className="text-sm font-bold">Ventajas Competitivas</h3>
-                </div>
-                <ul className="space-y-2">
-                  {insight.competitive_advantages.map((a, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm" style={{ color: "var(--text-secondary)" }}>
-                      <CheckCircle size={14} className="mt-0.5 flex-shrink-0" color="var(--success)" />
-                      {a}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
 
           {/* Next Steps */}
           {insight.next_steps && insight.next_steps.length > 0 && (

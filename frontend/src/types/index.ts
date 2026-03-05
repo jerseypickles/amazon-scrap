@@ -156,29 +156,10 @@ export interface AIEntryStrategy {
   target_rating: string;
 }
 
-export interface AIFinancials {
-  costo_unitario_china: string;
-  costo_envio_unidad: string;
-  costo_amazon_fba: string;
-  amazon_referral_fee: string;
-  costo_total_por_unidad: string;
-  precio_venta_sugerido: string;
-  margen_neto_unidad: string;
-  margen_porcentaje: string;
-  unidades_con_10k: string;
-  moq_china: string;
-  breakeven_unidades: string;
-  roi_6_meses: string;
-  roi_12_meses: string;
-  ltv_cliente_anual: string;
-}
-
-export interface AISourcing {
-  tipo_proveedor: string;
-  palabras_clave_alibaba: string[];
-  certificaciones_necesarias: string[];
-  tiempo_produccion_dias: number;
-  consejo_negociacion: string;
+export interface AICostEstimate {
+  margin_range: string;
+  min_investment: string;
+  breakeven_months: string;
 }
 
 export interface AIProductIdea {
@@ -186,19 +167,8 @@ export interface AIProductIdea {
   description: string;
   estimated_price: string;
   why: string;
-  china_cost?: string;
-  size_suggestion?: string;
-  subscribe_save?: boolean;
-  packaging_idea?: string;
   target_margin?: string;
   difficulty?: string;
-  tagline?: string;
-  target_price?: string;
-  key_features?: string[];
-  target_audience?: string;
-  competitive_edge?: string;
-  estimated_monthly_units?: string;
-  investment_level?: string;
 }
 
 export interface AIRisk {
@@ -222,43 +192,23 @@ export interface AIGoNoGo {
 }
 
 export interface AIMinViableVolume {
-  units_month_breakeven: string;
-  market_percentage_needed: string;
-  estimated_sales_position_50: string;
-  estimated_sales_position_20: string;
-  realistic_monthly_revenue: string;
-  mvv_achievable: boolean;
-  mvv_reasoning: string;
-}
-
-export interface AIFBAEvaluation {
-  prime_competitor_percentage: string;
-  fba_opportunity: string;
-  buy_box_advantage: string;
-  conversion_impact: string;
-  fbm_competitors: string;
+  units_breakeven: string;
+  achievable: boolean;
+  reasoning: string;
 }
 
 export interface AIPhaseRecommendation {
   current_phase: string;
   requires_brand_from_start: boolean;
   brand_reason: string;
-  buy_box_risk?: string;
   private_label_trigger: string;
   private_label_investment: string;
 }
 
 export interface AIPPCStrategy {
-  viable_with_ppc: boolean;
-  ppc_reasoning: string;
-  estimated_cpc: string;
-  target_acos: string;
-  monthly_ad_budget: string;
-  daily_budget_suggested: string;
-  long_tail_keywords: string[];
-  launch_strategy: string;
-  risk_without_ads: string;
-  breakeven_with_ads: string;
+  viable: boolean;
+  reasoning: string;
+  keywords: string[];
 }
 
 export interface AISubNiche {
@@ -276,17 +226,13 @@ export interface AIInsight {
   repurchase_weeks?: number;
   go_no_go?: AIGoNoGo;
   min_viable_volume?: AIMinViableVolume;
-  fba_evaluation?: AIFBAEvaluation;
   phase_recommendation?: AIPhaseRecommendation;
+  cost_estimate?: AICostEstimate;
   entry_strategy?: AIEntryStrategy;
-  financials?: AIFinancials;
-  sourcing?: AISourcing;
   ppc_strategy?: AIPPCStrategy;
   product_ideas?: AIProductIdea[];
   risks?: AIRisk[];
   sub_niches?: AISubNiche[];
-  competitive_advantages?: string[];
-  market_insights?: string[];
   next_steps?: string[];
   error?: string;
 }
