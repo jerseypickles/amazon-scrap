@@ -64,10 +64,10 @@ class NicheAnalyzer:
         # 2. Save products to DB
         await self._save_products(raw_products)
 
-        # 3. Calculate metrics
-        prices = [p["price"] for p in raw_products if p.get("price")]
-        ratings = [p["rating"] for p in raw_products if p.get("rating")]
-        reviews = [p["reviews_count"] for p in raw_products if p.get("reviews_count")]
+        # 3. Calculate metrics (filter None explicitly — .get() returns None when key exists with None value)
+        prices = [p["price"] for p in raw_products if p.get("price") is not None]
+        ratings = [p["rating"] for p in raw_products if p.get("rating") is not None]
+        reviews = [p["reviews_count"] for p in raw_products if p.get("reviews_count") is not None]
         brands = [p["brand"] for p in raw_products if p.get("brand")]
 
         # Price stats
@@ -88,9 +88,9 @@ class NicheAnalyzer:
             brand_products = [
                 p for p in raw_products if p.get("brand") == brand_name
             ]
-            bp = [p["price"] for p in brand_products if p.get("price")]
-            br = [p["rating"] for p in brand_products if p.get("rating")]
-            b_reviews = sum(p.get("reviews_count", 0) for p in brand_products)
+            bp = [p["price"] for p in brand_products if p.get("price") is not None]
+            br = [p["rating"] for p in brand_products if p.get("rating") is not None]
+            b_reviews = sum(p.get("reviews_count") or 0 for p in brand_products)
             b_best_seller = sum(1 for p in brand_products if p.get("is_best_seller"))
             b_amazon_choice = sum(1 for p in brand_products if p.get("is_amazon_choice"))
             b_has_bought = any(p.get("monthly_bought") for p in brand_products)
@@ -797,8 +797,10 @@ class NicheAnalyzer:
             if not bucket_products:
                 continue
             count = len(bucket_products)
-            avg_rev = statistics.mean([p.get("reviews_count", 0) for p in bucket_products])
-            avg_rat = statistics.mean([p["rating"] for p in bucket_products if p.get("rating")]) if any(p.get("rating") for p in bucket_products) else 0
+            rev_vals = [p.get("reviews_count") or 0 for p in bucket_products]
+            avg_rev = statistics.mean(rev_vals) if rev_vals else 0
+            rat_vals = [p["rating"] for p in bucket_products if p.get("rating") is not None]
+            avg_rat = statistics.mean(rat_vals) if rat_vals else 0
             has_bought = sum(1 for p in bucket_products if p.get("monthly_bought"))
 
             # Opportunity = low avg reviews (easy entry) + some demand (has_bought > 0)
@@ -858,7 +860,7 @@ class NicheAnalyzer:
                 return round(median_monthly_units * avg_price, 2)
 
         # Fallback: review-to-sales ratio (~1 review per 20 sales, last 12 months)
-        reviews = [p.get("reviews_count", 0) for p in products if p.get("reviews_count")]
+        reviews = [p["reviews_count"] for p in products if p.get("reviews_count") is not None and p["reviews_count"] > 0]
         if reviews:
             median_reviews = statistics.median(reviews)
             # Assume reviews accumulate over ~24 months avg product life
