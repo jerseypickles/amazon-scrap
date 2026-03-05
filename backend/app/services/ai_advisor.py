@@ -46,6 +46,7 @@ REVIEWS Y RATINGS:
 MÉTRICAS EXTENDIDAS:
 - % Productos Prime: {analysis_data.get('prime_percentage', 'N/A')}%
 - % Productos con "Monthly Bought": {analysis_data.get('monthly_bought_percentage', 'N/A')}%
+- Resultados Totales en Amazon: {analysis_data.get('search_result_count') or 'N/A'}
 
 COMPETENCIA:
 - Número de Marcas: {analysis_data.get('brand_count', 'N/A')}
@@ -121,6 +122,52 @@ PRESUPUESTO DISPONIBLE: ${b:,}
             for p in price_dist:
                 if isinstance(p, dict):
                     ctx += f"- {p.get('range', '?')}: {p.get('count', 0)} productos\n"
+
+        # ── Data quality warnings ──
+        warnings = []
+        prime_pct = analysis_data.get('prime_percentage')
+        brand_count = analysis_data.get('brand_count', 0)
+        total_products = analysis_data.get('total_products', 0)
+        avg_reviews = analysis_data.get('avg_reviews', 0)
+
+        if prime_pct is not None and prime_pct == 0 and total_products > 20:
+            warnings.append(
+                "PRIME 0%: Es MUY improbable que 0% de los productos tengan Prime en un nicho con "
+                f"{total_products} productos. Esto es probablemente un error del scraper. "
+                "En la realidad, la mayoría de nichos populares tienen 70-95% de productos Prime. "
+                "ASUME que el % Prime real es ~80-90% para tu análisis y NO penalices por este dato."
+            )
+
+        if brand_count == 0 and total_products > 10:
+            warnings.append(
+                "MARCAS 0: No se detectaron marcas. Esto es un error del scraper (Amazon no devuelve "
+                "el campo 'brand' en resultados de búsqueda). Las marcas SÍ existen en este nicho. "
+                "Basa tu análisis de competencia en reviews, ratings y badges, NO en la ausencia de marcas. "
+                "Infiere las marcas dominantes por los títulos si es posible."
+            )
+
+        if avg_reviews and avg_reviews > 5000 and brand_count == 0:
+            warnings.append(
+                "INCONSISTENCIA: Reviews promedio muy altas (>5000) pero 0 marcas detectadas. "
+                "Esto confirma un nicho de marcas FUERTES que el scraper no identificó. "
+                "Trata este nicho como altamente competitivo con marcas establecidas."
+            )
+
+        bs_count = sum(
+            1 for b_item in (analysis_data.get('top_brands') or [])
+            if isinstance(b_item, dict) and (b_item.get('best_seller_count', 0) > 0 or b_item.get('amazon_choice_count', 0) > 0)
+        )
+        if bs_count == 0 and total_products > 30 and avg_reviews and avg_reviews > 1000:
+            warnings.append(
+                "BADGES 0: No se detectaron Best Seller ni Amazon Choice badges. "
+                "Esto es probablemente un error del scraper. Nichos populares con alto volumen de reviews "
+                "normalmente tienen múltiples badges. No asumas que la ausencia de badges significa fácil entrada."
+            )
+
+        if warnings:
+            ctx += "\n⚠️ ALERTAS DE CALIDAD DE DATOS (IMPORTANTE - LEE ANTES DE ANALIZAR):\n"
+            for i, w in enumerate(warnings, 1):
+                ctx += f"{i}. {w}\n"
 
         return ctx
 
@@ -241,6 +288,14 @@ Usar Amazon FBA es una ventaja competitiva REAL que debes evaluar:
 - Logística resuelta: no necesitas bodega, no empacas, no envías. Solo reabastecer inventario.
 - Para el modelo de Fase 1 (reventa de marca china): FBA es ESENCIAL. Sin FBA, competir es casi imposible.
 Evalúa cuántos de los competidores actuales usan FBA vs FBM. Si muchos son FBM, hay oportunidad.
+
+VALIDACIÓN DE DATOS (MUY IMPORTANTE):
+Los datos vienen de un scraper automático que puede tener errores. ANTES de analizar, verifica la coherencia:
+- Si "% Prime = 0%" pero hay muchos productos con reviews altas → probablemente es error del scraper. Asume ~80-90% Prime en nichos populares.
+- Si "Marcas = 0" pero las reviews son altas → el scraper no extrajo las marcas. Infiere las marcas por los títulos de productos.
+- Si "Best Seller = 0" y "Amazon Choice = 0" en un nicho grande → probablemente error del scraper.
+- Usa tu conocimiento general del mercado Amazon para validar los datos. Si algo parece imposible, menciónalo.
+- NO bases conclusiones drásticas en un solo dato que parece anómalo. Cruza información.
 
 METODOLOGÍA DE ANÁLISIS (MUY IMPORTANTE):
 Tu análisis NO debe ser una opinión superficial. Debe ser un ESTUDIO EVALUADO que demuestra que revisaste cada ángulo:

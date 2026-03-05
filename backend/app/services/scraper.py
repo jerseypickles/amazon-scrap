@@ -70,6 +70,21 @@ class AmazonScraper:
 
         results = data.get("results", [])
         products = []
+        # Log first item's raw keys for debugging field mapping
+        if results:
+            sample = results[0]
+            logger.info(
+                "ScraperAPI raw keys for '%s': %s",
+                keyword, list(sample.keys()),
+            )
+            logger.info(
+                "ScraperAPI sample fields: has_prime=%s, is_prime=%s, is_best_seller=%s, "
+                "is_amazon_choice=%s, brand=%s, amazon_brand=%s, type=%s",
+                sample.get("has_prime"), sample.get("is_prime"),
+                sample.get("is_best_seller"), sample.get("is_amazon_choice"),
+                sample.get("brand"), sample.get("amazon_brand"),
+                sample.get("type"),
+            )
         for item in results:
             try:
                 product = self._parse_structured_item(item, keyword)
@@ -84,6 +99,46 @@ class AmazonScraper:
             keyword, page, len(products), total_results,
         )
         return products, int(total_results) if total_results else 0
+
+    @staticmethod
+    def _extract_brand_from_title(title: str) -> str | None:
+        """Try to extract brand name from the beginning of a product title.
+
+        Amazon product titles typically start with the brand name, e.g.:
+        "ARM & HAMMER Plus OxiClean ..." → "ARM & HAMMER"
+        "Tide PODS Laundry Detergent ..." → "Tide"
+        """
+        if not title:
+            return None
+        # Common patterns: "BrandName Product..." or "BrandName - Product..."
+        # Take the first word(s) before a common separator or product descriptor
+        # Heuristic: the brand is usually the first 1-3 capitalized words
+        parts = title.split()
+        if not parts:
+            return None
+
+        brand_words = []
+        for word in parts[:5]:  # Check first 5 words max
+            # Stop at common product words (lowercase or very long)
+            clean = word.rstrip(",").rstrip("-").rstrip("|")
+            if clean.lower() in (
+                "laundry", "liquid", "powder", "pods", "pack", "count",
+                "for", "with", "and", "the", "in", "of", "free", "plus",
+                "natural", "organic", "premium", "ultra", "original",
+                "fresh", "clean", "scent", "fragrance", "unscented",
+            ):
+                break
+            if len(clean) > 1 and (clean[0].isupper() or clean.isupper() or "&" in clean):
+                brand_words.append(clean)
+            else:
+                break
+
+        if brand_words:
+            brand = " ".join(brand_words)
+            # Avoid returning just a single short word as brand
+            if len(brand) >= 2:
+                return brand
+        return None
 
     def _parse_structured_item(self, item: dict, keyword: str) -> dict | None:
         asin = item.get("asin", "")
@@ -114,19 +169,44 @@ class AmazonScraper:
         # Monthly bought — e.g. "60K+ bought in past month"
         monthly_bought = item.get("purchase_history_message") or item.get("recently_bought") or None
 
+        # Brand — ScraperAPI search doesn't return brand, extract from title
+        title = item.get("name", "")
+        brand = item.get("brand") or None
+        if not brand:
+            brand = self._extract_brand_from_title(title)
+
+        # Prime — check multiple possible field names
+        is_prime = bool(
+            item.get("has_prime")
+            or item.get("is_prime")
+            or item.get("isPrime")
+        )
+
+        # Best Seller / Amazon Choice — check multiple field names
+        is_best_seller = bool(
+            item.get("is_best_seller")
+            or item.get("isBestSeller")
+            or item.get("best_seller")
+        )
+        is_amazon_choice = bool(
+            item.get("is_amazon_choice")
+            or item.get("isAmazonChoice")
+            or item.get("amazon_choice")
+        )
+
         return {
             "asin": asin,
-            "title": item.get("name", ""),
-            "brand": item.get("brand") or None,
+            "title": title,
+            "brand": brand,
             "price": price,
             "original_price": original_price,
             "rating": float(item["stars"]) if item.get("stars") else None,
             "reviews_count": int(item["total_reviews"]) if item.get("total_reviews") else None,
             "image_url": item.get("image") or item.get("image_url") or None,
             "product_url": item.get("url") or f"{AMAZON_BASE_URL}/dp/{asin}",
-            "is_prime": bool(item.get("has_prime")),
-            "is_best_seller": bool(item.get("is_best_seller")),
-            "is_amazon_choice": bool(item.get("is_amazon_choice")),
+            "is_prime": is_prime,
+            "is_best_seller": is_best_seller,
+            "is_amazon_choice": is_amazon_choice,
             "monthly_bought": monthly_bought,
             "search_keyword": keyword,
         }
