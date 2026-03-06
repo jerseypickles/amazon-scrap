@@ -130,6 +130,10 @@ export interface Category {
   name: string;
   node: string;
   repurchase_weeks?: number;
+  tip?: string;
+  volume?: "high" | "medium" | "low";
+  competition?: "high" | "medium" | "low";
+  search_terms?: string[];
   subcategories?: Category[];
 }
 
