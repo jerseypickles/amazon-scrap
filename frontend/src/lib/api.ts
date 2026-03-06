@@ -14,6 +14,7 @@ import type {
   TrackedProduct,
   TrackedProductStats,
   UserProfile,
+  QuickCheckResult,
 } from "@/types";
 
 const API_BASE = "/api";
@@ -70,6 +71,13 @@ export async function getAnalysis(id: number): Promise<NicheAnalysis> {
 
 export async function getAnalysisProducts(analysisId: number): Promise<AnalysisProductsResponse> {
   return fetchAPI(`/analysis/${analysisId}/products`);
+}
+
+export async function quickCheck(keyword: string): Promise<QuickCheckResult> {
+  return fetchAPI("/analysis/quick-check", {
+    method: "POST",
+    body: JSON.stringify({ keyword }),
+  });
 }
 
 export async function rescrapeAnalysis(analysisId: number): Promise<NicheAnalysis> {

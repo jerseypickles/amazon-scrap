@@ -96,6 +96,16 @@ async def cleanup_duplicate_analyses():
     }
 
 
+@router.post("/quick-check")
+async def quick_check_keyword(request: AnalysisRequest):
+    """Quick 1-page scrape for a keyword. Returns competitive data without saving."""
+    try:
+        result = await analyzer.quick_check(request.keyword)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Quick check failed: {str(e)}")
+
+
 @router.post("/{analysis_id}/rescrape")
 async def rescrape_analysis(analysis_id: int):
     """Force re-scrape an analysis using the latest scraper (structured API)."""

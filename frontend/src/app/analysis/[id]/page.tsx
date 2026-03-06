@@ -11,8 +11,8 @@ import {
   ChevronDown, ChevronUp, BarChart2,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { getAnalysis, getAIAnalysis, refreshAIAnalysis, getAnalysisProducts, addToWatchlist, checkWatchlist, rescrapeAnalysis, aiChat, analyzeNiche, trackProduct } from "@/lib/api";
-import type { NicheAnalysis, AIInsight, Product, ScoreBreakdown } from "@/types";
+import { getAnalysis, getAIAnalysis, refreshAIAnalysis, getAnalysisProducts, addToWatchlist, checkWatchlist, rescrapeAnalysis, aiChat, analyzeNiche, trackProduct, quickCheck } from "@/lib/api";
+import type { NicheAnalysis, AIInsight, Product, ScoreBreakdown, QuickCheckResult } from "@/types";
 
 /* ─── helpers ─── */
 
@@ -224,6 +224,8 @@ export default function AnalysisDetailPage() {
 
   // Sub-niche
   const [analyzingSubNiche, setAnalyzingSubNiche] = useState<string | null>(null);
+  const [subNicheChecks, setSubNicheChecks] = useState<Record<string, QuickCheckResult>>({});
+  const [checkingSubNiches, setCheckingSubNiches] = useState(false);
 
   // Rescrape / Watch / Track
   const [rescraping, setRescraping] = useState(false);
@@ -265,6 +267,21 @@ export default function AnalysisDetailPage() {
     if (!analysis?.keyword) return;
     checkWatchlist(analysis.keyword).then((res) => setWatched(res.watched)).catch(() => {});
   }, [analysis?.keyword]);
+
+  // Auto quick-check sub-niches when AI insight loads
+  useEffect(() => {
+    if (!aiInsight?.sub_niches || aiInsight.sub_niches.length === 0) return;
+    if (checkingSubNiches || Object.keys(subNicheChecks).length > 0) return;
+    setCheckingSubNiches(true);
+    const keywords = aiInsight.sub_niches.map((sn) => sn.keyword_amazon);
+    Promise.all(
+      keywords.map((kw) => quickCheck(kw).catch(() => null))
+    ).then((results) => {
+      const checks: Record<string, QuickCheckResult> = {};
+      results.forEach((r) => { if (r) checks[r.keyword] = r; });
+      setSubNicheChecks(checks);
+    }).finally(() => setCheckingSubNiches(false));
+  }, [aiInsight?.sub_niches]);
 
   async function handleRefreshAI() {
     if (!analysis) return;
@@ -880,38 +897,63 @@ export default function AnalysisDetailPage() {
             </div>
           )}
 
-          {/* Sub-Niches */}
+          {/* Sub-Niches with real data */}
           {aiInsight?.sub_niches && aiInsight.sub_niches.length > 0 && (
             <div className="card">
               <div className="flex items-center gap-2 mb-3">
                 <Zap size={15} color="#a855f7" />
                 <h4 className="text-sm font-bold">Sub-Nichos para Explorar</h4>
                 <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(168,85,247,0.1)", color: "#a855f7" }}>{aiInsight.sub_niches.length}</span>
+                {checkingSubNiches && <Loader2 size={12} className="animate-spin" color="#a855f7" />}
               </div>
-              <div className="space-y-2">
-                {aiInsight.sub_niches.map((sn, i) => (
-                  <div key={i} className="p-3 rounded-xl" style={{ background: "var(--bg-elevated)" }}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-bold">{sn.keyword_amazon}</span>
-                      <div className="flex items-center gap-2">
-                        {sn.price_range && <span className="text-[10px] font-bold" style={{ color: "var(--accent)" }}>{sn.price_range}</span>}
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{
-                          background: sn.competition === "baja" ? "rgba(16,185,129,0.1)" : sn.competition === "media" ? "rgba(245,158,11,0.1)" : "rgba(239,68,68,0.1)",
-                          color: sn.competition === "baja" ? "#10b981" : sn.competition === "media" ? "#f59e0b" : "#ef4444",
-                        }}>{sn.competition === "baja" ? "Baja" : sn.competition === "media" ? "Media" : "Alta"}</span>
+              <div className="space-y-3">
+                {aiInsight.sub_niches.map((sn, i) => {
+                  const check = subNicheChecks[sn.keyword_amazon];
+                  const diffColor = check?.difficulty === "easy" ? "#10b981" : check?.difficulty === "medium" ? "#f59e0b" : check?.difficulty === "hard" ? "#ef4444" : "var(--text-muted)";
+                  const diffLabel = check?.difficulty === "easy" ? "Fácil" : check?.difficulty === "medium" ? "Moderado" : check?.difficulty === "hard" ? "Difícil" : "...";
+                  return (
+                    <div key={i} className="p-3 rounded-xl" style={{ background: "var(--bg-elevated)" }}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-bold">{sn.keyword_amazon}</span>
+                        <div className="flex items-center gap-2">
+                          {sn.price_range && <span className="text-[10px] font-bold" style={{ color: "var(--accent)" }}>{sn.price_range}</span>}
+                          {check ? (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{
+                              background: `${diffColor}15`, color: diffColor,
+                            }}>{diffLabel} ({check.difficulty_score})</span>
+                          ) : checkingSubNiches ? (
+                            <Loader2 size={10} className="animate-spin" color="var(--text-muted)" />
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* Real data from quick-check */}
+                      {check && check.total_products > 0 && (
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 mb-1.5">
+                          <span className="text-[10px]"><span style={{ color: "var(--text-muted)" }}>Productos:</span> <strong>{check.total_products}</strong></span>
+                          {check.avg_price != null && <span className="text-[10px]"><span style={{ color: "var(--text-muted)" }}>Precio:</span> <strong style={{ color: "#f59e0b" }}>${check.avg_price.toFixed(2)}</strong></span>}
+                          {check.median_reviews != null && <span className="text-[10px]"><span style={{ color: "var(--text-muted)" }}>Reviews med:</span> <strong style={{ color: check.median_reviews < 100 ? "#10b981" : check.median_reviews < 300 ? "#f59e0b" : "#ef4444" }}>{check.median_reviews.toLocaleString()}</strong></span>}
+                          {check.brand_count != null && <span className="text-[10px]"><span style={{ color: "var(--text-muted)" }}>Marcas:</span> <strong>{check.brand_count}</strong></span>}
+                          {check.estimated_margin != null && <span className="text-[10px]"><span style={{ color: "var(--text-muted)" }}>Margen:</span> <strong style={{ color: check.estimated_margin >= 30 ? "#10b981" : check.estimated_margin >= 20 ? "#f59e0b" : "#ef4444" }}>~{check.estimated_margin}%</strong></span>}
+                          {check.top3_brand_share != null && <span className="text-[10px]"><span style={{ color: "var(--text-muted)" }}>Top3:</span> <strong style={{ color: check.top3_brand_share > 50 ? "#ef4444" : "#10b981" }}>{check.top3_brand_share}%</strong></span>}
+                        </div>
+                      )}
+                      {check && check.total_products === 0 && (
+                        <p className="text-[10px] mb-1.5" style={{ color: "var(--warning)" }}>Sin resultados en Amazon para esta keyword</p>
+                      )}
+
+                      <p className="text-[11px] mb-1.5" style={{ color: "var(--text-muted)" }}>{sn.why_viable}</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded font-bold" style={{ background: "rgba(249,115,22,0.1)", color: "#f97316" }}>Alibaba: {sn.keyword_alibaba}</span>
+                        <button onClick={() => handleAnalyzeSubNiche(sn.keyword_amazon)} disabled={analyzingSubNiche !== null}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all"
+                          style={{ background: "rgba(168,85,247,0.1)", color: "#a855f7", border: "1px solid rgba(168,85,247,0.2)" }}>
+                          {analyzingSubNiche === sn.keyword_amazon ? <><Loader2 size={10} className="animate-spin" /> Analizando...</> : <><Search size={10} /> Análisis Completo</>}
+                        </button>
                       </div>
                     </div>
-                    <p className="text-[11px] mb-1.5" style={{ color: "var(--text-muted)" }}>{sn.why_viable}</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[9px] px-1.5 py-0.5 rounded font-bold" style={{ background: "rgba(249,115,22,0.1)", color: "#f97316" }}>Alibaba: {sn.keyword_alibaba}</span>
-                      <button onClick={() => handleAnalyzeSubNiche(sn.keyword_amazon)} disabled={analyzingSubNiche !== null}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all"
-                        style={{ background: "rgba(168,85,247,0.1)", color: "#a855f7", border: "1px solid rgba(168,85,247,0.2)" }}>
-                        {analyzingSubNiche === sn.keyword_amazon ? <><Loader2 size={10} className="animate-spin" /> Analizando...</> : <><Search size={10} /> Analizar</>}
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

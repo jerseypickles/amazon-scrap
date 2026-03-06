@@ -883,6 +883,112 @@ class NicheAnalyzer:
 
         return None
 
+    async def quick_check(self, keyword: str) -> dict:
+        """Quick 1-page scrape to get real competitive data for a sub-niche.
+
+        Does NOT save to DB. Returns a lightweight difficulty assessment.
+        Costs 1 API credit (1 search page).
+        """
+        raw_products, search_result_count = await scraper.search_products(keyword, page=1)
+
+        if not raw_products:
+            return {
+                "keyword": keyword,
+                "total_products": 0,
+                "difficulty": "unknown",
+                "difficulty_score": None,
+                "avg_price": None,
+                "median_reviews": None,
+                "brand_count": None,
+                "top3_brand_share": None,
+                "estimated_margin": None,
+                "monthly_bought_pct": None,
+                "search_result_count": search_result_count or None,
+            }
+
+        n = len(raw_products)
+        prices = [p["price"] for p in raw_products if p.get("price") is not None]
+        reviews = [p["reviews_count"] for p in raw_products if p.get("reviews_count") is not None]
+        brands = [p["brand"] for p in raw_products if p.get("brand")]
+
+        avg_price = round(statistics.mean(prices), 2) if prices else None
+        median_price = statistics.median(prices) if prices else None
+        median_reviews = round(statistics.median(reviews), 0) if reviews else None
+
+        brand_counter = Counter(brands)
+        brand_count = len(brand_counter)
+        total_branded = len(brands)
+        top3_share = (
+            round(sum(c for _, c in brand_counter.most_common(3)) / total_branded * 100, 1)
+            if total_branded else None
+        )
+
+        # Estimated margin
+        estimated_margin = None
+        if median_price and median_price > 0:
+            cost = (median_price * 0.15) + 3.50 + (median_price * 0.25) + 1.50
+            estimated_margin = round(((median_price - cost) / median_price) * 100, 1)
+
+        # Monthly bought coverage
+        bought_count = sum(1 for p in raw_products if p.get("monthly_bought"))
+        monthly_bought_pct = round(bought_count / n * 100, 1) if n else None
+
+        # Difficulty score (0-100, higher = harder)
+        difficulty_score = 0.0
+        if median_reviews is not None:
+            if median_reviews >= 1000:
+                difficulty_score += 40
+            elif median_reviews >= 500:
+                difficulty_score += 30
+            elif median_reviews >= 200:
+                difficulty_score += 20
+            elif median_reviews >= 50:
+                difficulty_score += 10
+            else:
+                difficulty_score += 0
+
+        if top3_share is not None:
+            if top3_share >= 60:
+                difficulty_score += 30
+            elif top3_share >= 40:
+                difficulty_score += 20
+            elif top3_share >= 25:
+                difficulty_score += 10
+
+        if brand_count is not None:
+            if brand_count <= 3:
+                difficulty_score += 20
+            elif brand_count <= 5:
+                difficulty_score += 10
+
+        # Extra: many badges = entrenched market
+        badge_count = sum(1 for p in raw_products if p.get("is_best_seller") or p.get("is_amazon_choice"))
+        if badge_count >= 5:
+            difficulty_score += 10
+
+        difficulty_score = min(difficulty_score, 100)
+
+        if difficulty_score >= 60:
+            difficulty = "hard"
+        elif difficulty_score >= 35:
+            difficulty = "medium"
+        else:
+            difficulty = "easy"
+
+        return {
+            "keyword": keyword,
+            "total_products": n,
+            "difficulty": difficulty,
+            "difficulty_score": round(difficulty_score, 0),
+            "avg_price": avg_price,
+            "median_reviews": median_reviews,
+            "brand_count": brand_count,
+            "top3_brand_share": top3_share,
+            "estimated_margin": estimated_margin,
+            "monthly_bought_pct": monthly_bought_pct,
+            "search_result_count": search_result_count or None,
+        }
+
     async def get_analysis_history(self, db_ref=None, limit: int = 20):
         """Return most recent analysis per unique keyword."""
         pipeline = [

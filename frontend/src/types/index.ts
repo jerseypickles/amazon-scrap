@@ -217,9 +217,22 @@ export interface AIPPCStrategy {
 export interface AISubNiche {
   keyword_amazon: string;
   keyword_alibaba: string;
-  competition: string;
   why_viable: string;
   price_range: string;
+}
+
+export interface QuickCheckResult {
+  keyword: string;
+  total_products: number;
+  difficulty: string; // "easy" | "medium" | "hard" | "unknown"
+  difficulty_score: number | null;
+  avg_price: number | null;
+  median_reviews: number | null;
+  brand_count: number | null;
+  top3_brand_share: number | null;
+  estimated_margin: number | null;
+  monthly_bought_pct: number | null;
+  search_result_count: number | null;
 }
 
 export interface AIInsight {

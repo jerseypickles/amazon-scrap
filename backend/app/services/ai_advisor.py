@@ -297,9 +297,8 @@ PRESUPUESTO DISPONIBLE: ${b:,}
     ],
     "sub_nichos": [
         {{
-            "keyword_amazon": "keyword específica para Amazon",
-            "keyword_alibaba": "keyword para Alibaba/1688",
-            "competencia_estimada": "baja|media|alta",
+            "keyword_amazon": "keyword específica y real para buscar en Amazon",
+            "keyword_alibaba": "keyword para buscar en Alibaba/1688",
             "porque_viable": "Por qué este sub-nicho puede funcionar con ${b:,}",
             "precio_estimado_rango": "$XX - $XX"
         }}
@@ -340,6 +339,8 @@ REGLAS CLAVE:
 - Evalúa múltiples escenarios: (A) entrada directa, (B) sub-nicho específico, (C) formato diferente.
 - Busca en los datos de saturación si hay newcomers (<50 reviews) — eso indica si hay espacio para nuevos vendedores.
 - Máximo 3 ideas de producto, 3 riesgos, 5 sub-nichos. Sé conciso.
+- Para ideas de producto: usa la ventana de oportunidad de precio (rangos con demanda pero pocas reviews) y el desglose de calidad (espacio para mejorar = productos populares con rating bajo). Basa las ideas en gaps reales de los datos.
+- Para sub-nichos: sugiere keywords REALES y específicas que un usuario buscaría en Amazon. NO inventes la competencia — solo explica por qué el sub-nicho podría ser más accesible que el nicho principal.
 
 Analiza estos datos de Amazon US:
 
@@ -489,7 +490,6 @@ Responde SOLO con JSON válido (sin markdown, sin ```):
             sub_niches.append({
                 "keyword_amazon": sn.get("keyword_amazon", ""),
                 "keyword_alibaba": sn.get("keyword_alibaba", ""),
-                "competition": sn.get("competencia_estimada", "media"),
                 "why_viable": sn.get("porque_viable", ""),
                 "price_range": sn.get("precio_estimado_rango", ""),
             })
