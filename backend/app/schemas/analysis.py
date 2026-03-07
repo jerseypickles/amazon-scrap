@@ -70,6 +70,15 @@ class NicheAnalysisResponse(BaseModel):
     price_distribution: list[PriceRange] = []
     rating_distribution: list[dict] = []
     review_distribution: list[dict] = []
+    # Keepa historical data
+    keepa_trend: dict | None = None
+    keepa_seasonality: dict | None = None
+    keepa_price_stability: dict | None = None
+    keepa_seller_dynamics: dict | None = None
+    keepa_rating_evolution: dict | None = None
+    keepa_sales_estimate: dict | None = None
+    keepa_data_confidence: int | None = None
+    keepa_products_analyzed: int | None = None
     parent_keyword: str | None = None
     created_at: datetime | None = None
     is_cached: bool = False

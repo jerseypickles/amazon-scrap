@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     mongodb_uri: str = ""
     cors_origins: str = "http://localhost:3000"
     anthropic_api_key: str = ""
+    keepa_api_key: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

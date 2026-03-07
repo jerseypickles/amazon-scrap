@@ -10,6 +10,7 @@ import app.database as _database
 from app.models.analysis import new_analysis_doc
 from app.models.product import new_product_doc
 from app.schemas.analysis import BrandInfo, NicheAnalysisResponse, PriceRange
+from app.services.keepa_service import keepa_service
 from app.services.scraper import scraper
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,21 @@ class NicheAnalyzer:
 
         # 2. Save products to DB
         await self._save_products(raw_products)
+
+        # 2b. Enrich with Keepa historical data (top 15 ASINs)
+        keepa_data = None
+        top_asins = [p["asin"] for p in raw_products if p.get("asin")][:15]
+        if top_asins:
+            try:
+                keepa_data = await keepa_service.enrich_asins(top_asins, days=90)
+                if keepa_data:
+                    logger.info(
+                        "Keepa enrichment for '%s': %d products, confidence %d%%",
+                        keyword, keepa_data.get("keepa_products_analyzed", 0),
+                        keepa_data.get("data_confidence", 0),
+                    )
+            except Exception as exc:
+                logger.warning("Keepa enrichment failed for '%s': %s", keyword, exc)
 
         # 3. Calculate metrics (filter None explicitly — .get() returns None when key exists with None value)
         prices = [p["price"] for p in raw_products if p.get("price") is not None]
@@ -135,13 +151,13 @@ class NicheAnalyzer:
         # Review distribution
         review_dist = self._calc_review_distribution(reviews)
 
-        # Opportunity scores — pass full product data for richer analysis
-        demand_score, demand_bd = self._calc_demand_score(raw_products, reviews, prices)
+        # Opportunity scores — pass full product data + Keepa enrichment
+        demand_score, demand_bd = self._calc_demand_score(raw_products, reviews, prices, keepa_data)
         competition_score, competition_bd = self._calc_competition_score(
-            raw_products, reviews, brand_count, top3_share,
+            raw_products, reviews, brand_count, top3_share, keepa_data,
         )
-        price_score, price_bd = self._calc_price_score(prices, avg_price, median_price)
-        quality_gap_score, quality_bd = self._calc_quality_gap_score(ratings, reviews)
+        price_score, price_bd = self._calc_price_score(prices, avg_price, median_price, keepa_data)
+        quality_gap_score, quality_bd = self._calc_quality_gap_score(ratings, reviews, keepa_data)
 
         opportunity_score = round(
             (demand_score * 0.30)
@@ -156,8 +172,8 @@ class NicheAnalyzer:
             keyword, demand_score, competition_score, price_score, quality_gap_score, opportunity_score,
         )
 
-        # Revenue estimate
-        revenue_estimate = self._estimate_monthly_revenue(raw_products, avg_price)
+        # Revenue estimate — prefer Keepa BSR-based sales if available
+        revenue_estimate = self._estimate_monthly_revenue(raw_products, avg_price, keepa_data)
 
         # Extended metrics
         n = len(raw_products)
@@ -216,6 +232,15 @@ class NicheAnalyzer:
             price_distribution=[p.model_dump() for p in price_dist],
             rating_distribution=rating_dist,
             review_distribution=review_dist,
+            # Keepa historical data
+            keepa_trend=keepa_data.get("trend") if keepa_data else None,
+            keepa_seasonality=keepa_data.get("seasonality") if keepa_data else None,
+            keepa_price_stability=keepa_data.get("price_stability") if keepa_data else None,
+            keepa_seller_dynamics=keepa_data.get("seller_dynamics") if keepa_data else None,
+            keepa_rating_evolution=keepa_data.get("rating_evolution") if keepa_data else None,
+            keepa_sales_estimate=keepa_data.get("sales_estimate") if keepa_data else None,
+            keepa_data_confidence=keepa_data.get("data_confidence") if keepa_data else None,
+            keepa_products_analyzed=keepa_data.get("keepa_products_analyzed") if keepa_data else None,
         )
 
         now = datetime.now(timezone.utc)
@@ -329,10 +354,12 @@ class NicheAnalyzer:
 
     def _calc_demand_score(
         self, products: list[dict], reviews: list[int], prices: list[float],
+        keepa: dict | None = None,
     ) -> tuple[float, list[dict]]:
         """Demand = is there real buyer activity in this niche?
 
-        Returns (score, breakdown) where breakdown is a list of signal dicts.
+        When Keepa data is available, BSR-based sales estimates replace the
+        unreliable "monthly_bought" text and a trend signal is added.
         """
         breakdown = []
         if not products:
@@ -341,38 +368,68 @@ class NicheAnalyzer:
         n = len(products)
         score = 0.0
 
-        # --- Signal 1: monthly_bought (40% weight) ---
-        bought_texts = [p["monthly_bought"] for p in products if p.get("monthly_bought")]
-        if bought_texts:
-            bought_nums = [self._parse_monthly_bought(t) for t in bought_texts]
-            avg_bought = statistics.mean(bought_nums) if bought_nums else 0
-            coverage = len(bought_texts) / n
+        # Determine weights: with Keepa we add a trend signal so adjust
+        has_keepa_sales = keepa and keepa.get("sales_estimate")
+        has_keepa_trend = keepa and keepa.get("trend")
+        if has_keepa_sales:
+            w_sales, w_rev, w_breadth, w_fba, w_trend = 30, 20, 10, 15, 25
+        else:
+            w_sales, w_rev, w_breadth, w_fba, w_trend = 40, 30, 15, 15, 0
 
-            if avg_bought >= 10000:
+        # --- Signal 1: Sales volume ---
+        if has_keepa_sales:
+            # Use Keepa BSR-based estimate (much more reliable)
+            median_sales = keepa["sales_estimate"]["median_monthly_units"]
+            if median_sales >= 3000:
                 bought_score = 100
-            elif avg_bought >= 5000:
+            elif median_sales >= 1500:
                 bought_score = 85
-            elif avg_bought >= 2000:
+            elif median_sales >= 800:
                 bought_score = 70
-            elif avg_bought >= 1000:
+            elif median_sales >= 400:
                 bought_score = 55
-            elif avg_bought >= 500:
+            elif median_sales >= 150:
                 bought_score = 40
-            elif avg_bought >= 100:
+            elif median_sales >= 50:
                 bought_score = 25
             else:
                 bought_score = 10
-
-            bought_score *= max(coverage, 0.3)
-            signal_val = round(bought_score * 0.40, 1)
+            signal_val = round(bought_score * w_sales / 100, 1)
             score += signal_val
-            breakdown.append({"signal": "Compras Mensuales", "value": f"{avg_bought:,.0f} prom ({coverage:.0%} cobertura)", "score": round(bought_score, 1), "weight": 40, "weighted": signal_val})
+            breakdown.append({"signal": "Ventas Mensuales (Keepa BSR)", "value": f"{median_sales:,.0f} uds/mes mediana", "score": round(bought_score, 1), "weight": w_sales, "weighted": signal_val})
         else:
-            signal_val = round(20 * 0.40, 1)
-            score += signal_val
-            breakdown.append({"signal": "Compras Mensuales", "value": "Sin datos", "score": 20, "weight": 40, "weighted": signal_val})
+            # Fallback: scraper "monthly_bought" text
+            bought_texts = [p["monthly_bought"] for p in products if p.get("monthly_bought")]
+            if bought_texts:
+                bought_nums = [self._parse_monthly_bought(t) for t in bought_texts]
+                avg_bought = statistics.mean(bought_nums) if bought_nums else 0
+                coverage = len(bought_texts) / n
 
-        # --- Signal 2: review velocity proxy (30% weight) ---
+                if avg_bought >= 10000:
+                    bought_score = 100
+                elif avg_bought >= 5000:
+                    bought_score = 85
+                elif avg_bought >= 2000:
+                    bought_score = 70
+                elif avg_bought >= 1000:
+                    bought_score = 55
+                elif avg_bought >= 500:
+                    bought_score = 40
+                elif avg_bought >= 100:
+                    bought_score = 25
+                else:
+                    bought_score = 10
+
+                bought_score *= max(coverage, 0.3)
+                signal_val = round(bought_score * w_sales / 100, 1)
+                score += signal_val
+                breakdown.append({"signal": "Compras Mensuales", "value": f"{avg_bought:,.0f} prom ({coverage:.0%} cobertura)", "score": round(bought_score, 1), "weight": w_sales, "weighted": signal_val})
+            else:
+                signal_val = round(20 * w_sales / 100, 1)
+                score += signal_val
+                breakdown.append({"signal": "Compras Mensuales", "value": "Sin datos", "score": 20, "weight": w_sales, "weighted": signal_val})
+
+        # --- Signal 2: review velocity proxy ---
         if reviews:
             median_reviews = statistics.median(reviews)
             if median_reviews >= 1000:
@@ -389,23 +446,23 @@ class NicheAnalyzer:
                 rev_score = 20
             else:
                 rev_score = 10
-            signal_val = round(rev_score * 0.30, 1)
+            signal_val = round(rev_score * w_rev / 100, 1)
             score += signal_val
-            breakdown.append({"signal": "Mediana Reviews", "value": f"{median_reviews:,.0f}", "score": rev_score, "weight": 30, "weighted": signal_val})
+            breakdown.append({"signal": "Mediana Reviews", "value": f"{median_reviews:,.0f}", "score": rev_score, "weight": w_rev, "weighted": signal_val})
         else:
-            signal_val = round(10 * 0.30, 1)
+            signal_val = round(10 * w_rev / 100, 1)
             score += signal_val
-            breakdown.append({"signal": "Mediana Reviews", "value": "0", "score": 10, "weight": 30, "weighted": signal_val})
+            breakdown.append({"signal": "Mediana Reviews", "value": "0", "score": 10, "weight": w_rev, "weighted": signal_val})
 
-        # --- Signal 3: market breadth (15% weight) ---
+        # --- Signal 3: market breadth ---
         products_with_reviews = sum(1 for r in reviews if r > 0) if reviews else 0
         activity_ratio = products_with_reviews / n if n else 0
         breadth_score = activity_ratio * 100
-        signal_val = round(breadth_score * 0.15, 1)
+        signal_val = round(breadth_score * w_breadth / 100, 1)
         score += signal_val
-        breakdown.append({"signal": "Actividad del Mercado", "value": f"{activity_ratio:.0%} con reviews", "score": round(breadth_score, 1), "weight": 15, "weighted": signal_val})
+        breakdown.append({"signal": "Actividad del Mercado", "value": f"{activity_ratio:.0%} con reviews", "score": round(breadth_score, 1), "weight": w_breadth, "weighted": signal_val})
 
-        # --- Signal 4: FBA viability (15% weight) ---
+        # --- Signal 4: FBA viability ---
         prime_count = sum(1 for p in products if p.get("is_prime"))
         prime_ratio = prime_count / n if n else 0
         if prime_ratio >= 0.7:
@@ -416,19 +473,48 @@ class NicheAnalyzer:
             fba_score = 40
         else:
             fba_score = 20
-        signal_val = round(fba_score * 0.15, 1)
+        signal_val = round(fba_score * w_fba / 100, 1)
         score += signal_val
-        breakdown.append({"signal": "Viabilidad FBA", "value": f"{prime_ratio:.0%} Prime", "score": fba_score, "weight": 15, "weighted": signal_val})
+        breakdown.append({"signal": "Viabilidad FBA", "value": f"{prime_ratio:.0%} Prime", "score": fba_score, "weight": w_fba, "weighted": signal_val})
+
+        # --- Signal 5: Keepa trend (only when available) ---
+        if has_keepa_trend and w_trend > 0:
+            trend = keepa["trend"]
+            direction = trend["direction"]
+            change = abs(trend["avg_bsr_change_pct"])
+            if direction == "growing":
+                # BSR declining = more sales → high demand
+                if change >= 30:
+                    trend_score = 95
+                elif change >= 15:
+                    trend_score = 80
+                else:
+                    trend_score = 65
+            elif direction == "declining":
+                # BSR rising = fewer sales
+                if change >= 30:
+                    trend_score = 15
+                elif change >= 15:
+                    trend_score = 30
+                else:
+                    trend_score = 45
+            else:
+                trend_score = 55  # stable
+            signal_val = round(trend_score * w_trend / 100, 1)
+            score += signal_val
+            label = {"growing": "↑ Creciendo", "declining": "↓ Cayendo", "stable": "→ Estable"}[direction]
+            breakdown.append({"signal": "Tendencia Keepa (90d)", "value": f"{label} ({trend['avg_bsr_change_pct']:+.1f}% BSR)", "score": trend_score, "weight": w_trend, "weighted": signal_val})
 
         return round(min(max(score, 0), 100), 1), breakdown
 
     def _calc_competition_score(
         self, products: list[dict], reviews: list[int],
         brand_count: int | None, top3_share: float | None,
+        keepa: dict | None = None,
     ) -> tuple[float, list[dict]]:
         """Competition = how hard is it to enter this niche?
         HIGH score = LOW competition (good for us).
-        Returns (score, breakdown).
+        When Keepa data is available, seller dynamics replace review gap.
         """
         breakdown = []
         if not products:
@@ -437,7 +523,14 @@ class NicheAnalyzer:
         n = len(products)
         score = 0.0
 
-        # --- Signal 1: How entrenched are the leaders? (35% weight) ---
+        has_keepa_sellers = keepa and keepa.get("seller_dynamics")
+        # With Keepa we replace the review gap signal with seller dynamics
+        if has_keepa_sellers:
+            w_leaders, w_conc, w_div, w_badges, w_sellers = 30, 20, 15, 15, 20
+        else:
+            w_leaders, w_conc, w_div, w_badges, w_gap = 35, 25, 15, 15, 10
+
+        # --- Signal 1: How entrenched are the leaders? ---
         sorted_reviews = sorted(reviews, reverse=True) if reviews else []
         top10_reviews = sorted_reviews[:10]
         if top10_reviews:
@@ -454,14 +547,15 @@ class NicheAnalyzer:
                 leader_score = 25
             else:
                 leader_score = 10
-            signal_val = round(leader_score * 0.35, 1)
+            signal_val = round(leader_score * w_leaders / 100, 1)
             score += signal_val
-            breakdown.append({"signal": "Líderes Atrincherados", "value": f"{median_top10:,.0f} reviews mediana top-10", "score": leader_score, "weight": 35, "weighted": signal_val})
+            breakdown.append({"signal": "Líderes Atrincherados", "value": f"{median_top10:,.0f} reviews mediana top-10", "score": leader_score, "weight": w_leaders, "weighted": signal_val})
         else:
-            score += 50 * 0.35
-            breakdown.append({"signal": "Líderes Atrincherados", "value": "Sin datos", "score": 50, "weight": 35, "weighted": round(50 * 0.35, 1)})
+            signal_val = round(50 * w_leaders / 100, 1)
+            score += signal_val
+            breakdown.append({"signal": "Líderes Atrincherados", "value": "Sin datos", "score": 50, "weight": w_leaders, "weighted": signal_val})
 
-        # --- Signal 2: Brand concentration (25% weight) ---
+        # --- Signal 2: Brand concentration ---
         if top3_share is not None:
             if top3_share < 20:
                 conc_score = 90
@@ -475,14 +569,15 @@ class NicheAnalyzer:
                 conc_score = 20
             else:
                 conc_score = 5
-            signal_val = round(conc_score * 0.25, 1)
+            signal_val = round(conc_score * w_conc / 100, 1)
             score += signal_val
-            breakdown.append({"signal": "Concentración Top-3", "value": f"{top3_share:.1f}% del mercado", "score": conc_score, "weight": 25, "weighted": signal_val})
+            breakdown.append({"signal": "Concentración Top-3", "value": f"{top3_share:.1f}% del mercado", "score": conc_score, "weight": w_conc, "weighted": signal_val})
         else:
-            score += 50 * 0.25
-            breakdown.append({"signal": "Concentración Top-3", "value": "Sin datos", "score": 50, "weight": 25, "weighted": round(50 * 0.25, 1)})
+            signal_val = round(50 * w_conc / 100, 1)
+            score += signal_val
+            breakdown.append({"signal": "Concentración Top-3", "value": "Sin datos", "score": 50, "weight": w_conc, "weighted": signal_val})
 
-        # --- Signal 3: Brand diversity (15% weight) ---
+        # --- Signal 3: Brand diversity ---
         if brand_count is not None:
             if brand_count >= 20:
                 div_score = 85
@@ -496,14 +591,15 @@ class NicheAnalyzer:
                 div_score = 25
             else:
                 div_score = 10
-            signal_val = round(div_score * 0.15, 1)
+            signal_val = round(div_score * w_div / 100, 1)
             score += signal_val
-            breakdown.append({"signal": "Diversidad de Marcas", "value": f"{brand_count} marcas únicas", "score": div_score, "weight": 15, "weighted": signal_val})
+            breakdown.append({"signal": "Diversidad de Marcas", "value": f"{brand_count} marcas únicas", "score": div_score, "weight": w_div, "weighted": signal_val})
         else:
-            score += 50 * 0.15
-            breakdown.append({"signal": "Diversidad de Marcas", "value": "Sin datos", "score": 50, "weight": 15, "weighted": round(50 * 0.15, 1)})
+            signal_val = round(50 * w_div / 100, 1)
+            score += signal_val
+            breakdown.append({"signal": "Diversidad de Marcas", "value": "Sin datos", "score": 50, "weight": w_div, "weighted": signal_val})
 
-        # --- Signal 4: Amazon dominance indicators (15% weight) ---
+        # --- Signal 4: Amazon dominance indicators ---
         badge_count = sum(
             1 for p in products
             if p.get("is_best_seller") or p.get("is_amazon_choice")
@@ -519,44 +615,71 @@ class NicheAnalyzer:
             badge_score = 35
         else:
             badge_score = 15
-        signal_val = round(badge_score * 0.15, 1)
+        signal_val = round(badge_score * w_badges / 100, 1)
         score += signal_val
-        breakdown.append({"signal": "Badges Amazon", "value": f"{badge_count} badges ({badge_ratio:.0%})", "score": badge_score, "weight": 15, "weighted": signal_val})
+        breakdown.append({"signal": "Badges Amazon", "value": f"{badge_count} badges ({badge_ratio:.0%})", "score": badge_score, "weight": w_badges, "weighted": signal_val})
 
-        # --- Signal 5: Review gap between top and bottom (10% weight) ---
-        if len(sorted_reviews) >= 5:
-            top_median = statistics.median(sorted_reviews[:5])
-            bottom_median = statistics.median(sorted_reviews[-5:])
-            if top_median > 0 and bottom_median >= 0:
-                ratio = bottom_median / top_median if top_median else 0
-                if ratio < 0.01:
-                    gap_score = 80
-                elif ratio < 0.05:
-                    gap_score = 65
-                elif ratio < 0.15:
-                    gap_score = 50
-                elif ratio < 0.30:
-                    gap_score = 35
-                else:
-                    gap_score = 20
-                signal_val = round(gap_score * 0.10, 1)
-                score += signal_val
-                breakdown.append({"signal": "Brecha Reviews", "value": f"Top {top_median:,.0f} vs Bottom {bottom_median:,.0f}", "score": gap_score, "weight": 10, "weighted": signal_val})
+        # --- Signal 5: Seller dynamics (Keepa) OR Review gap (fallback) ---
+        if has_keepa_sellers:
+            sd = keepa["seller_dynamics"]
+            change = sd["avg_seller_change_pct"]
+            inc_pct = sd["sellers_increasing_pct"]
+            # More sellers entering = harder competition (lower score)
+            if change >= 30:
+                seller_score = 15  # rapid influx
+            elif change >= 15:
+                seller_score = 30
+            elif change >= 5:
+                seller_score = 50
+            elif change >= -5:
+                seller_score = 65  # stable
+            elif change >= -15:
+                seller_score = 75  # sellers leaving
             else:
-                score += 50 * 0.10
-                breakdown.append({"signal": "Brecha Reviews", "value": "Sin datos", "score": 50, "weight": 10, "weighted": round(50 * 0.10, 1)})
+                seller_score = 85  # exodus
+            signal_val = round(seller_score * w_sellers / 100, 1)
+            score += signal_val
+            breakdown.append({"signal": "Dinámica Sellers (Keepa)", "value": f"{change:+.1f}% sellers ({sd['avg_current_sellers']:.0f} prom)", "score": seller_score, "weight": w_sellers, "weighted": signal_val})
         else:
-            score += 50 * 0.10
-            breakdown.append({"signal": "Brecha Reviews", "value": "Pocos productos", "score": 50, "weight": 10, "weighted": round(50 * 0.10, 1)})
+            # Fallback: review gap
+            if len(sorted_reviews) >= 5:
+                top_median = statistics.median(sorted_reviews[:5])
+                bottom_median = statistics.median(sorted_reviews[-5:])
+                if top_median > 0 and bottom_median >= 0:
+                    ratio = bottom_median / top_median if top_median else 0
+                    if ratio < 0.01:
+                        gap_score = 80
+                    elif ratio < 0.05:
+                        gap_score = 65
+                    elif ratio < 0.15:
+                        gap_score = 50
+                    elif ratio < 0.30:
+                        gap_score = 35
+                    else:
+                        gap_score = 20
+                    signal_val = round(gap_score * w_gap / 100, 1)
+                    score += signal_val
+                    breakdown.append({"signal": "Brecha Reviews", "value": f"Top {top_median:,.0f} vs Bottom {bottom_median:,.0f}", "score": gap_score, "weight": w_gap, "weighted": signal_val})
+                else:
+                    signal_val = round(50 * w_gap / 100, 1)
+                    score += signal_val
+                    breakdown.append({"signal": "Brecha Reviews", "value": "Sin datos", "score": 50, "weight": w_gap, "weighted": signal_val})
+            else:
+                signal_val = round(50 * w_gap / 100, 1)
+                score += signal_val
+                breakdown.append({"signal": "Brecha Reviews", "value": "Pocos productos", "score": 50, "weight": w_gap, "weighted": signal_val})
 
         return round(min(max(score, 0), 100), 1), breakdown
 
     def _calc_price_score(
         self, prices: list[float],
         avg_price: float | None, median_price: float | None,
+        keepa: dict | None = None,
     ) -> tuple[float, list[dict]]:
         """Price = is the price point viable for private label profit?
-        Returns (score, breakdown).
+
+        When Keepa data is available, price stability replaces diversity
+        (more useful for investment decisions).
         """
         breakdown = []
         if not prices or avg_price is None:
@@ -565,7 +688,13 @@ class NicheAnalyzer:
         score = 0.0
         ref_price = median_price if median_price else avg_price
 
-        # --- Signal 1: Price sweet spot (50% weight) ---
+        has_keepa_price = keepa and keepa.get("price_stability")
+        if has_keepa_price:
+            w_sweet, w_margin, w_stability = 40, 30, 30
+        else:
+            w_sweet, w_margin, w_diversity = 50, 30, 20
+
+        # --- Signal 1: Price sweet spot ---
         if 20 <= ref_price <= 40:
             sweet_score = 95
         elif 18 <= ref_price < 20 or 40 < ref_price <= 50:
@@ -580,11 +709,11 @@ class NicheAnalyzer:
             sweet_score = 10
         else:
             sweet_score = 30
-        signal_val = round(sweet_score * 0.50, 1)
+        signal_val = round(sweet_score * w_sweet / 100, 1)
         score += signal_val
-        breakdown.append({"signal": "Rango de Precio", "value": f"${ref_price:.2f} (ideal $18-45)", "score": sweet_score, "weight": 50, "weighted": signal_val})
+        breakdown.append({"signal": "Rango de Precio", "value": f"${ref_price:.2f} (ideal $18-45)", "score": sweet_score, "weight": w_sweet, "weighted": signal_val})
 
-        # --- Signal 2: Estimated net margin (30% weight) ---
+        # --- Signal 2: Estimated net margin ---
         fba_fee = 3.50
         ship_to_fba = 1.50
         referral_pct = 0.15
@@ -607,40 +736,66 @@ class NicheAnalyzer:
             margin_score = 20
         else:
             margin_score = 5
-        signal_val = round(margin_score * 0.30, 1)
+        signal_val = round(margin_score * w_margin / 100, 1)
         score += signal_val
-        breakdown.append({"signal": "Margen Neto Estimado", "value": f"{estimated_margin_pct:.0f}%", "score": margin_score, "weight": 30, "weighted": signal_val})
+        breakdown.append({"signal": "Margen Neto Estimado", "value": f"{estimated_margin_pct:.0f}%", "score": margin_score, "weight": w_margin, "weighted": signal_val})
 
-        # --- Signal 3: Price diversity (20% weight) ---
-        if len(prices) >= 3:
-            price_stdev = statistics.stdev(prices)
-            cv = (price_stdev / avg_price) if avg_price > 0 else 0
-            if cv >= 0.6:
-                diversity_score = 85
-            elif cv >= 0.4:
-                diversity_score = 70
-            elif cv >= 0.25:
-                diversity_score = 55
-            elif cv >= 0.15:
-                diversity_score = 40
+        # --- Signal 3: Price stability (Keepa) OR diversity (fallback) ---
+        if has_keepa_price:
+            ps = keepa["price_stability"]
+            cv = ps["avg_cv"]
+            declining_pct = ps["prices_declining_pct"]
+            # Low CV + not declining = great for margins
+            if cv < 0.05 and declining_pct < 20:
+                stab_score = 95
+            elif cv < 0.10 and declining_pct < 30:
+                stab_score = 80
+            elif cv < 0.15:
+                stab_score = 65
+            elif cv < 0.25:
+                stab_score = 45
+            elif cv < 0.35:
+                stab_score = 30
             else:
-                diversity_score = 20
-            signal_val = round(diversity_score * 0.20, 1)
+                stab_score = 15
+            # Penalize if many prices declining
+            if declining_pct >= 50:
+                stab_score = min(stab_score, 30)
+            signal_val = round(stab_score * w_stability / 100, 1)
             score += signal_val
-            breakdown.append({"signal": "Diversidad de Precios", "value": f"CV {cv:.2f}", "score": diversity_score, "weight": 20, "weighted": signal_val})
+            breakdown.append({"signal": "Estabilidad Precios (Keepa)", "value": f"CV {cv:.3f}, {declining_pct:.0f}% en caída", "score": stab_score, "weight": w_stability, "weighted": signal_val})
         else:
-            signal_val = round(40 * 0.20, 1)
-            score += signal_val
-            breakdown.append({"signal": "Diversidad de Precios", "value": "Pocos productos", "score": 40, "weight": 20, "weighted": signal_val})
+            if len(prices) >= 3:
+                price_stdev = statistics.stdev(prices)
+                cv = (price_stdev / avg_price) if avg_price > 0 else 0
+                if cv >= 0.6:
+                    diversity_score = 85
+                elif cv >= 0.4:
+                    diversity_score = 70
+                elif cv >= 0.25:
+                    diversity_score = 55
+                elif cv >= 0.15:
+                    diversity_score = 40
+                else:
+                    diversity_score = 20
+                signal_val = round(diversity_score * w_diversity / 100, 1)
+                score += signal_val
+                breakdown.append({"signal": "Diversidad de Precios", "value": f"CV {cv:.2f}", "score": diversity_score, "weight": w_diversity, "weighted": signal_val})
+            else:
+                signal_val = round(40 * w_diversity / 100, 1)
+                score += signal_val
+                breakdown.append({"signal": "Diversidad de Precios", "value": "Pocos productos", "score": 40, "weight": w_diversity, "weighted": signal_val})
 
         return round(min(max(score, 0), 100), 1), breakdown
 
     def _calc_quality_gap_score(
         self, ratings: list[float], reviews: list[int],
+        keepa: dict | None = None,
     ) -> tuple[float, list[dict]]:
         """Quality Gap = is there room to win by making a better product?
         HIGH score = customers are unhappy (opportunity).
-        Returns (score, breakdown).
+
+        When Keepa data is available, rating evolution adds temporal context.
         """
         breakdown = []
         if not ratings:
@@ -649,7 +804,13 @@ class NicheAnalyzer:
         n = len(ratings)
         score = 0.0
 
-        # --- Signal 1: % of products under 4.0 stars (35% weight) ---
+        has_keepa_rating = keepa and keepa.get("rating_evolution")
+        if has_keepa_rating:
+            w_under4, w_weighted, w_under43, w_variance, w_evolution = 30, 25, 15, 10, 20
+        else:
+            w_under4, w_weighted, w_under43, w_variance, w_evolution = 35, 30, 20, 15, 0
+
+        # --- Signal 1: % of products under 4.0 stars ---
         under_4 = sum(1 for r in ratings if r < 4.0)
         pct_under_4 = (under_4 / n) * 100
 
@@ -667,11 +828,11 @@ class NicheAnalyzer:
             dissatisfaction_score = 20
         else:
             dissatisfaction_score = 10
-        signal_val = round(dissatisfaction_score * 0.35, 1)
+        signal_val = round(dissatisfaction_score * w_under4 / 100, 1)
         score += signal_val
-        breakdown.append({"signal": "Productos <4.0 Estrellas", "value": f"{pct_under_4:.0f}% ({under_4}/{n})", "score": dissatisfaction_score, "weight": 35, "weighted": signal_val})
+        breakdown.append({"signal": "Productos <4.0 Estrellas", "value": f"{pct_under_4:.0f}% ({under_4}/{n})", "score": dissatisfaction_score, "weight": w_under4, "weighted": signal_val})
 
-        # --- Signal 2: Weighted dissatisfaction (30% weight) ---
+        # --- Signal 2: Weighted dissatisfaction ---
         if reviews and len(reviews) == len(ratings):
             total_review_weight = sum(reviews) if reviews else 1
             weighted_bad = sum(
@@ -692,9 +853,9 @@ class NicheAnalyzer:
                 weighted_score = 30
             else:
                 weighted_score = 10
-            signal_val = round(weighted_score * 0.30, 1)
+            signal_val = round(weighted_score * w_weighted / 100, 1)
             score += signal_val
-            breakdown.append({"signal": "Insatisfacción Ponderada", "value": f"{bad_weight_pct:.0f}% reviews en productos <4.0", "score": weighted_score, "weight": 30, "weighted": signal_val})
+            breakdown.append({"signal": "Insatisfacción Ponderada", "value": f"{bad_weight_pct:.0f}% reviews en productos <4.0", "score": weighted_score, "weight": w_weighted, "weighted": signal_val})
         else:
             avg_rating = statistics.mean(ratings)
             if avg_rating < 3.5:
@@ -709,11 +870,11 @@ class NicheAnalyzer:
                 fb = 20
             else:
                 fb = 10
-            signal_val = round(fb * 0.30, 1)
+            signal_val = round(fb * w_weighted / 100, 1)
             score += signal_val
-            breakdown.append({"signal": "Insatisfacción Ponderada", "value": f"Rating prom {avg_rating:.1f}", "score": fb, "weight": 30, "weighted": signal_val})
+            breakdown.append({"signal": "Insatisfacción Ponderada", "value": f"Rating prom {avg_rating:.1f}", "score": fb, "weight": w_weighted, "weighted": signal_val})
 
-        # --- Signal 3: % under 4.3 stars (20% weight) ---
+        # --- Signal 3: % under 4.3 stars ---
         under_43 = sum(1 for r in ratings if r < 4.3)
         pct_under_43 = (under_43 / n) * 100
 
@@ -727,11 +888,11 @@ class NicheAnalyzer:
             moderate_score = 35
         else:
             moderate_score = 15
-        signal_val = round(moderate_score * 0.20, 1)
+        signal_val = round(moderate_score * w_under43 / 100, 1)
         score += signal_val
-        breakdown.append({"signal": "Productos <4.3 Estrellas", "value": f"{pct_under_43:.0f}% ({under_43}/{n})", "score": moderate_score, "weight": 20, "weighted": signal_val})
+        breakdown.append({"signal": "Productos <4.3 Estrellas", "value": f"{pct_under_43:.0f}% ({under_43}/{n})", "score": moderate_score, "weight": w_under43, "weighted": signal_val})
 
-        # --- Signal 4: Rating variance (15% weight) ---
+        # --- Signal 4: Rating variance ---
         if len(ratings) >= 5:
             stdev = statistics.stdev(ratings)
             if stdev >= 0.7:
@@ -744,13 +905,34 @@ class NicheAnalyzer:
                 var_score = 35
             else:
                 var_score = 15
-            signal_val = round(var_score * 0.15, 1)
+            signal_val = round(var_score * w_variance / 100, 1)
             score += signal_val
-            breakdown.append({"signal": "Varianza de Calidad", "value": f"Desv. {stdev:.2f}", "score": var_score, "weight": 15, "weighted": signal_val})
+            breakdown.append({"signal": "Varianza de Calidad", "value": f"Desv. {stdev:.2f}", "score": var_score, "weight": w_variance, "weighted": signal_val})
         else:
-            signal_val = round(40 * 0.15, 1)
+            signal_val = round(40 * w_variance / 100, 1)
             score += signal_val
-            breakdown.append({"signal": "Varianza de Calidad", "value": "Pocos productos", "score": 40, "weight": 15, "weighted": signal_val})
+            breakdown.append({"signal": "Varianza de Calidad", "value": "Pocos productos", "score": 40, "weight": w_variance, "weighted": signal_val})
+
+        # --- Signal 5: Rating evolution (Keepa) ---
+        if has_keepa_rating and w_evolution > 0:
+            re = keepa["rating_evolution"]
+            declining_pct = re["ratings_declining_pct"]
+            change = re["avg_rating_change"]
+            # Declining ratings = opportunity (customers unhappy, room to improve)
+            if declining_pct >= 50:
+                evo_score = 90
+            elif declining_pct >= 30:
+                evo_score = 70
+            elif declining_pct >= 15:
+                evo_score = 55
+            elif change >= 0.1:
+                evo_score = 25  # ratings improving = competitors adapting
+            else:
+                evo_score = 40  # stable
+            signal_val = round(evo_score * w_evolution / 100, 1)
+            score += signal_val
+            direction_label = re["verdict"]
+            breakdown.append({"signal": "Evolución Ratings (Keepa)", "value": f"{change:+.2f} estrellas, {declining_pct:.0f}% cayendo", "score": evo_score, "weight": w_evolution, "weighted": signal_val})
 
         return round(min(max(score, 0), 100), 1), breakdown
 
@@ -854,30 +1036,36 @@ class NicheAnalyzer:
 
     def _estimate_monthly_revenue(
         self, products: list[dict], avg_price: float | None,
+        keepa: dict | None = None,
     ) -> float | None:
-        """Estimate monthly revenue per seller using monthly_bought data.
+        """Estimate monthly revenue per seller.
 
-        If monthly_bought is available, use it directly (most accurate).
-        Otherwise, fall back to the industry-standard review-to-sales ratio
-        of ~1 review per 15-25 sales (we use 20).
+        Priority:
+        1. Keepa BSR-based sales estimate (most reliable)
+        2. Scraper "monthly_bought" text
+        3. Review-to-sales ratio fallback
         """
         if not avg_price or not products:
             return None
 
+        # 1. Keepa BSR-based estimate
+        if keepa and keepa.get("sales_estimate"):
+            median_units = keepa["sales_estimate"]["median_monthly_units"]
+            if median_units > 0:
+                return round(median_units * avg_price, 2)
+
+        # 2. Scraper monthly_bought text
         bought_texts = [p["monthly_bought"] for p in products if p.get("monthly_bought")]
         if bought_texts:
             bought_nums = [self._parse_monthly_bought(t) for t in bought_texts]
             if bought_nums:
-                # Use median (not mean) to avoid one viral product skewing everything
                 median_monthly_units = statistics.median(bought_nums)
                 return round(median_monthly_units * avg_price, 2)
 
-        # Fallback: review-to-sales ratio (~1 review per 20 sales, last 12 months)
+        # 3. Fallback: review-to-sales ratio (~1 review per 20 sales, last 12 months)
         reviews = [p["reviews_count"] for p in products if p.get("reviews_count") is not None and p["reviews_count"] > 0]
         if reviews:
             median_reviews = statistics.median(reviews)
-            # Assume reviews accumulate over ~24 months avg product life
-            # ~1 review per 20 purchases → monthly sales ≈ median_reviews / 24 * 20
             estimated_monthly_units = (median_reviews / 24) * 20
             return round(estimated_monthly_units * avg_price, 2)
 
@@ -1098,6 +1286,15 @@ class NicheAnalyzer:
             price_distribution=price_distribution,
             rating_distribution=rating_distribution,
             review_distribution=review_distribution,
+            # Keepa historical data
+            keepa_trend=a.get("keepa_trend"),
+            keepa_seasonality=a.get("keepa_seasonality"),
+            keepa_price_stability=a.get("keepa_price_stability"),
+            keepa_seller_dynamics=a.get("keepa_seller_dynamics"),
+            keepa_rating_evolution=a.get("keepa_rating_evolution"),
+            keepa_sales_estimate=a.get("keepa_sales_estimate"),
+            keepa_data_confidence=a.get("keepa_data_confidence"),
+            keepa_products_analyzed=a.get("keepa_products_analyzed"),
             created_at=a.get("created_at"),
         )
 

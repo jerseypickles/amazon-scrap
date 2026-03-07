@@ -43,5 +43,14 @@ def new_analysis_doc(id: int, **fields) -> dict:
         "price_distribution": fields.get("price_distribution"),  # list of dicts
         "rating_distribution": fields.get("rating_distribution"),  # list of dicts
         "review_distribution": fields.get("review_distribution"),  # list of dicts
+        # Keepa historical data
+        "keepa_trend": fields.get("keepa_trend"),
+        "keepa_seasonality": fields.get("keepa_seasonality"),
+        "keepa_price_stability": fields.get("keepa_price_stability"),
+        "keepa_seller_dynamics": fields.get("keepa_seller_dynamics"),
+        "keepa_rating_evolution": fields.get("keepa_rating_evolution"),
+        "keepa_sales_estimate": fields.get("keepa_sales_estimate"),
+        "keepa_data_confidence": fields.get("keepa_data_confidence"),
+        "keepa_products_analyzed": fields.get("keepa_products_analyzed"),
         "created_at": datetime.now(timezone.utc),
     }
