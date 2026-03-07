@@ -41,7 +41,7 @@ class KeepaService:
         """Query Keepa for *asins* and return aggregated niche-level metrics.
 
         Returns a dict with trend/seasonality/stability data or None on
-        failure / missing API key.  Consumes 1 token per ASIN.
+        failure / missing API key.  Consumes ~1 token per ASIN (no offers).
         """
         if not self.enabled or not asins:
             return None
@@ -55,13 +55,15 @@ class KeepaService:
                 stats=days,
                 rating=True,
                 days=days,
-                offers=20,
                 out_of_stock_as_nan=True,
                 progress_bar=False,
                 wait=True,
             )
         except Exception as exc:
-            logger.warning("Keepa query failed for %d ASINs: %s", len(asins), exc)
+            logger.warning(
+                "Keepa query failed for %d ASINs: [%s] %r",
+                len(asins), type(exc).__name__, exc,
+            )
             return None
 
         if not products:
