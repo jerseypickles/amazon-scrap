@@ -217,6 +217,55 @@ function DetailPanel({ product, onClose }: { product: TrackedProduct; onClose: (
             </div>
           </div>
 
+          {/* Revenue Estimado */}
+          {(() => {
+            const listingUnits = parseMonthlyBought(product.current_monthly_bought);
+            const listingRev = listingUnits && product.current_price ? listingUnits * product.current_price : null;
+            const asinUnits = product.keepa_sales_estimate?.median_monthly_units ?? null;
+            const asinRev = asinUnits && product.current_price ? asinUnits * product.current_price : null;
+            if (!listingRev && !asinRev) return null;
+            return (
+              <div className="card mb-4">
+                <p className="text-xs font-bold mb-3 flex items-center gap-1.5">
+                  <DollarSign size={12} color="#10b981" /> Revenue Estimado
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Listing Revenue (all variations) */}
+                  <div className="p-3 rounded-lg text-center" style={{ background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.15)" }}>
+                    <p className="text-[9px] font-bold uppercase mb-1" style={{ color: "var(--text-muted)" }}>Revenue Listado</p>
+                    <p className="text-lg font-black" style={{ color: "#10b981" }}>
+                      {listingRev ? `~$${formatRevenue(listingRev)}` : "--"}
+                    </p>
+                    <p className="text-[9px]" style={{ color: "var(--text-muted)" }}>
+                      {listingUnits ? `${listingUnits.toLocaleString()} uds/mes` : "--"}
+                    </p>
+                    <p className="text-[8px] mt-1 px-1.5 py-0.5 rounded inline-block" style={{ background: "rgba(16,185,129,0.1)", color: "#10b981" }}>
+                      Todas las variaciones
+                    </p>
+                  </div>
+                  {/* ASIN-specific Revenue (Keepa) */}
+                  <div className="p-3 rounded-lg text-center" style={{ background: "rgba(249,115,22,0.06)", border: "1px solid rgba(249,115,22,0.15)" }}>
+                    <p className="text-[9px] font-bold uppercase mb-1" style={{ color: "var(--text-muted)" }}>Ventas ASIN</p>
+                    <p className="text-lg font-black" style={{ color: "#f97316" }}>
+                      {asinRev ? `~$${formatRevenue(asinRev)}` : "--"}
+                    </p>
+                    <p className="text-[9px]" style={{ color: "var(--text-muted)" }}>
+                      {asinUnits ? `~${asinUnits.toLocaleString()} uds/mes` : "Sin datos Keepa"}
+                    </p>
+                    <p className="text-[8px] mt-1 px-1.5 py-0.5 rounded inline-block" style={{ background: "rgba(249,115,22,0.1)", color: "#f97316" }}>
+                      Solo este ASIN
+                    </p>
+                  </div>
+                </div>
+                {listingRev && asinRev && (
+                  <p className="text-[9px] mt-2 text-center" style={{ color: "var(--text-muted)" }}>
+                    Este ASIN representa ~{Math.round((asinRev / listingRev) * 100)}% del revenue total del listado
+                  </p>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Keepa Historical Data (90 days) */}
           {product.keepa_data_confidence != null && product.keepa_data_confidence > 0 && (
             <div className="card mb-4">
@@ -961,7 +1010,7 @@ export default function ProductTrackerPage() {
                               <Flame size={8} /> {p.current_monthly_bought}
                             </span>
                           )}
-                          {(() => { const units = parseMonthlyBought(p.current_monthly_bought); const rev = units && p.current_price ? units * p.current_price : null; return rev ? <span className="text-[8px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-0.5" style={{ background: "rgba(16,185,129,0.1)", color: "#10b981" }}><DollarSign size={8} /> ~{formatRevenue(rev)}/mes</span> : null; })()}
+                          {(() => { const units = parseMonthlyBought(p.current_monthly_bought); const rev = units && p.current_price ? units * p.current_price : null; return rev ? <span className="text-[8px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-0.5" style={{ background: "rgba(16,185,129,0.1)", color: "#10b981" }}><DollarSign size={8} /> ~{formatRevenue(rev)}/mes (listado)</span> : null; })()}
                           {p.has_coupon && (
                             <span className="text-[8px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-0.5" style={{ background: "rgba(239,68,68,0.12)", color: "#ef4444" }}>
                               <Tag size={8} /> COUPON

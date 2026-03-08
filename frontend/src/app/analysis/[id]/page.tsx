@@ -174,7 +174,7 @@ function ProductCard({ p, rank, onTrack, tracking }: { p: Product; rank: number;
           {p.is_best_seller && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-0.5" style={{ background: "rgba(249,115,22,0.12)", color: "#f97316" }}><Award size={8} /> BEST SELLER</span>}
           {p.is_amazon_choice && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-0.5" style={{ background: "rgba(16,185,129,0.12)", color: "#10b981" }}><BadgeCheck size={8} /> CHOICE</span>}
           {p.monthly_bought && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-0.5" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}><Flame size={8} /> {p.monthly_bought}</span>}
-          {(() => { const units = parseMonthlyBought(p.monthly_bought); const rev = units && p.price ? units * p.price : null; return rev ? <span className="text-[8px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-0.5" style={{ background: "rgba(16,185,129,0.1)", color: "#10b981" }}><DollarSign size={8} /> ~{formatRevenue(rev)}/mes</span> : null; })()}
+          {(() => { const units = parseMonthlyBought(p.monthly_bought); const rev = units && p.price ? units * p.price : null; return rev ? <span className="text-[8px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-0.5" style={{ background: "rgba(16,185,129,0.1)", color: "#10b981" }}><DollarSign size={8} /> ~{formatRevenue(rev)}/mes (listado)</span> : null; })()}
         </div>
         <div className="flex items-center gap-3 mt-1.5">
           {p.price ? (
