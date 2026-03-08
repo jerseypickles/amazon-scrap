@@ -63,8 +63,12 @@ SCORES DE OPORTUNIDAD (0-100):
 - Score Competencia: {analysis_data.get('competition_score', 'N/A')} (más alto = menos competencia)
 - Score Precio: {analysis_data.get('price_score', 'N/A')}
 - Score Calidad: {analysis_data.get('quality_gap_score', 'N/A')} (más alto = más espacio para mejorar)
+- Score Viabilidad Entrante: {analysis_data.get('entrant_viability_score', 'N/A')} (más alto = más viable para vendedor nuevo)
 
-REVENUE MENSUAL ESTIMADO POR PRODUCTO: ${analysis_data.get('revenue_estimate', 'N/A')}
+REVENUE MENSUAL ESTIMADO (3 niveles):
+- Revenue Entrada (percentil 25 — nuevo vendedor): ${analysis_data.get('revenue_entry', 'N/A')}
+- Revenue Medio (percentil 50 — vendedor establecido): ${analysis_data.get('revenue_estimate', 'N/A')}
+- Revenue Top (percentil 90 — líderes del nicho): ${analysis_data.get('revenue_top', 'N/A')}
 PRESUPUESTO DISPONIBLE: ${b:,}
 """
         for label, key in [
@@ -72,6 +76,7 @@ PRESUPUESTO DISPONIBLE: ${b:,}
             ("DESGLOSE COMPETENCIA", "competition_breakdown"),
             ("DESGLOSE PRECIO", "price_breakdown"),
             ("DESGLOSE CALIDAD", "quality_breakdown"),
+            ("DESGLOSE VIABILIDAD ENTRANTE", "entrant_viability_breakdown"),
         ]:
             breakdown = analysis_data.get(key) or []
             if breakdown:
@@ -96,7 +101,7 @@ PRESUPUESTO DISPONIBLE: ${b:,}
             ranges = price_opp.get('ranges', [])
             for r in ranges:
                 if isinstance(r, dict):
-                    ctx += f"  · {r.get('range', '?')}: {r.get('count', 0)} productos, avg reviews={r.get('avg_reviews', 0):.0f}, entrada={r.get('entry_ease', '?')}, demanda={'Sí' if r.get('has_demand') else 'No'}\n"
+                    ctx += f"  · {r.get('range', '?')}: {r.get('count', 0)} productos, reviews mediana={r.get('avg_reviews', 0):.0f}, pequeños(<300rev)={r.get('small_sellers', 'N/A')}, entrada={r.get('entry_ease', '?')}, demanda={'Sí' if r.get('has_demand') else 'No'}\n"
 
         brands = analysis_data.get('top_brands', [])
         if brands:
@@ -244,16 +249,15 @@ PRESUPUESTO DISPONIBLE: ${b:,}
     "frecuencia_recompra_semanas": 4,
     "go_no_go": {{
         "decision": "GO|NO-GO|CAUTELA",
-        "margen_sin_marca": true,
         "margen_mayor_30": true,
-        "reviews_mediana_menor_300": true,
-        "mercado_no_saturado": true,
+        "pequenos_vendiendo": true,
+        "revenue_entrada_viable": true,
         "precio_en_rango_fba": true,
         "sin_certificaciones_complejas": true,
-        "entrada_generica_viable": true,
+        "entrada_viable_algun_rango": true,
         "viable_con_ppc": true,
         "vmv_alcanzable": true,
-        "resumen": "2-3 oraciones: datos concretos que justifican la decisión. Si es NO-GO, di por qué sin buscar ángulos forzados."
+        "resumen": "2-3 oraciones: datos concretos que justifican la decisión. Enfócate en si un vendedor PEQUEÑO puede hacer dinero, no en si puede dominar el mercado."
     }},
 {fase_block},
     "estrategia_entrada": {{
@@ -330,16 +334,19 @@ PRESUPUESTO DISPONIBLE: ${b:,}
 {profile_prompt}
 
 REGLAS CLAVE:
+- FILOSOFÍA CENTRAL: NO estás evaluando si el vendedor puede ser #1 o dominar el nicho. Estás evaluando si un vendedor PEQUEÑO puede HACER DINERO en este nicho — aunque sea en la posición #40 o #50.
+- Que existan gigantes como Bertolli o Charmin NO es razón para un NO-GO. Lo que importa es: ¿hay vendedores pequeños (<500 reviews) que están vendiendo activamente? Si sí, hay espacio.
+- Usa los 3 niveles de revenue (Entrada/Medio/Top) para evaluar. El "Revenue Entrada" es lo que realistamente ganaría un nuevo vendedor. Evalúa si ESE número, con el margen estimado, justifica la inversión.
+- Usa el "Score Viabilidad Entrante" y su desglose — este score mide directamente si vendedores pequeños sobreviven en el nicho.
 - Sé honesto y directo. Si un nicho es NO-GO, dilo con datos concretos. No busques ángulos forzados.
 - Solo recomienda GO si los datos lo justifican. CAUTELA o NO-GO honesto es más valioso que un GO forzado.
 - NO inventes números exactos que no puedes saber (CPC exacto, precio FOB exacto, ROI exacto). Usa rangos estimados.
 - Los datos del scraper pueden tener errores — si un dato parece imposible (ej: 0% Prime en nicho grande), menciónalo.
-- Calcula VMV (Volumen Mínimo Viable): unidades/mes para breakeven. Evalúa si es realista según la saturación del mercado.
+- Calcula VMV (Volumen Mínimo Viable): unidades/mes para breakeven. Compara con el "Revenue Entrada" — si el VMV es menor que el revenue de entrada, es alcanzable.
 - Si la keyword es genérica/amplia, sugiere sub-nichos más específicos con keywords reales de Amazon.
-- Evalúa múltiples escenarios: (A) entrada directa, (B) sub-nicho específico, (C) formato diferente.
-- Busca en los datos de saturación si hay newcomers (<50 reviews) — eso indica si hay espacio para nuevos vendedores.
+- Busca en la ventana de oportunidad de precio los rangos con "pequeños" (productos <300 reviews) — ahí es donde puedes entrar.
 - Máximo 3 ideas de producto, 3 riesgos, 5 sub-nichos. Sé conciso.
-- Para ideas de producto: usa la ventana de oportunidad de precio (rangos con demanda pero pocas reviews) y el desglose de calidad (espacio para mejorar = productos populares con rating bajo). Basa las ideas en gaps reales de los datos.
+- Para ideas de producto: usa la ventana de oportunidad de precio (rangos con pequeños vendedores activos) y el desglose de calidad. Basa las ideas en gaps reales de los datos.
 - Para sub-nichos: sugiere keywords REALES y específicas que un usuario buscaría en Amazon. NO inventes la competencia — solo explica por qué el sub-nicho podría ser más accesible que el nicho principal.
 
 Analiza estos datos de Amazon US:
@@ -412,13 +419,12 @@ Responde SOLO con JSON válido (sin markdown, sin ```):
             decision_map = {"GO": "go", "NO-GO": "no-go", "CAUTELA": "caution"}
             go_no_go = {
                 "decision": decision_map.get(go_raw.get("decision", ""), go_raw.get("decision", "")),
-                "margin_without_brand": go_raw.get("margen_sin_marca", False),
                 "margin_above_30": go_raw.get("margen_mayor_30", False),
-                "median_reviews_below_300": go_raw.get("reviews_mediana_menor_300", False),
-                "market_not_saturated": go_raw.get("mercado_no_saturado", False),
+                "small_sellers_active": go_raw.get("pequenos_vendiendo", False),
+                "entry_revenue_viable": go_raw.get("revenue_entrada_viable", False),
                 "price_in_fba_range": go_raw.get("precio_en_rango_fba", False),
                 "no_complex_certs": go_raw.get("sin_certificaciones_complejas", False),
-                "generic_entry_viable": go_raw.get("entrada_generica_viable", False),
+                "entry_viable_some_range": go_raw.get("entrada_viable_algun_rango", False),
                 "viable_with_ppc": go_raw.get("viable_con_ppc", False),
                 "mvv_achievable": go_raw.get("vmv_alcanzable", False),
                 "summary": go_raw.get("resumen", ""),

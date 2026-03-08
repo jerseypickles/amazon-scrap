@@ -509,14 +509,13 @@ export default function AnalysisDetailPage() {
               <div className="grid grid-cols-3 gap-2 mb-3">
                 {[
                   { label: "Margen >30%", ok: aiInsight.go_no_go.margin_above_30 },
-                  { label: "Reviews <300 med", ok: aiInsight.go_no_go.median_reviews_below_300 },
-                  { label: "No saturado", ok: aiInsight.go_no_go.market_not_saturated },
+                  { label: "Pequeños vendiendo", ok: aiInsight.go_no_go.small_sellers_active },
+                  { label: "Revenue entrada viable", ok: aiInsight.go_no_go.entry_revenue_viable },
                   { label: "Precio FBA", ok: aiInsight.go_no_go.price_in_fba_range },
                   { label: "Sin cert. complejas", ok: aiInsight.go_no_go.no_complex_certs },
-                  { label: "Entrada genérica", ok: aiInsight.go_no_go.generic_entry_viable },
+                  { label: "Entrada viable", ok: aiInsight.go_no_go.entry_viable_some_range },
                   { label: "PPC viable", ok: aiInsight.go_no_go.viable_with_ppc },
                   { label: "VMV alcanzable", ok: aiInsight.go_no_go.mvv_achievable },
-                  { label: "Margen sin marca", ok: aiInsight.go_no_go.margin_without_brand },
                 ].map((item) => (
                   <div key={item.label} className="flex items-center gap-1.5 text-[11px]">
                     <span className="w-4 h-4 rounded flex items-center justify-center text-[10px] flex-shrink-0"

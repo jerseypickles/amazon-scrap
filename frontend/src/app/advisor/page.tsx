@@ -497,13 +497,14 @@ export default function AdvisorPage() {
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
                 {([
-                  { key: "margin_without_brand" as const, label: "Margen sin marca" },
                   { key: "margin_above_30" as const, label: "Margen >30%" },
-                  { key: "median_reviews_below_300" as const, label: "Reviews med. <300" },
-                  { key: "market_not_saturated" as const, label: "Mercado no saturado" },
+                  { key: "small_sellers_active" as const, label: "Pequeños vendiendo" },
+                  { key: "entry_revenue_viable" as const, label: "Revenue entrada viable" },
                   { key: "price_in_fba_range" as const, label: "Precio en rango FBA" },
                   { key: "no_complex_certs" as const, label: "Sin certif. complejas" },
-                  { key: "generic_entry_viable" as const, label: "Entrada viable" },
+                  { key: "entry_viable_some_range" as const, label: "Entrada viable" },
+                  { key: "viable_with_ppc" as const, label: "PPC viable" },
+                  { key: "mvv_achievable" as const, label: "VMV alcanzable" },
                 ]).map((item) => {
                   const passed = insight.go_no_go![item.key];
                   return (

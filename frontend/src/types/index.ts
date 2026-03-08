@@ -191,13 +191,12 @@ export interface AIRisk {
 
 export interface AIGoNoGo {
   decision: string; // "go" | "no-go" | "caution"
-  margin_without_brand: boolean;
   margin_above_30: boolean;
-  median_reviews_below_300: boolean;
-  market_not_saturated: boolean;
+  small_sellers_active: boolean;
+  entry_revenue_viable: boolean;
   price_in_fba_range: boolean;
   no_complex_certs: boolean;
-  generic_entry_viable: boolean;
+  entry_viable_some_range: boolean;
   viable_with_ppc: boolean;
   mvv_achievable: boolean;
   summary: string;
