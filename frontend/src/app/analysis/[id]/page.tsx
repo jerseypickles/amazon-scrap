@@ -676,31 +676,33 @@ export default function AnalysisDetailPage() {
       {/* ── Tab: Mercado ── */}
       {activeTab === "mercado" && (
         <div className="space-y-4">
-          {/* 4 Sub-scores */}
+          {/* 5 Sub-scores */}
           <div className="card">
             <div className="flex items-center justify-around flex-wrap gap-4">
               <MiniGauge label="Demanda" score={analysis.demand_score} icon={TrendingUp} color="#10b981" />
               <MiniGauge label="Competencia" score={analysis.competition_score} icon={Users} color="#6366f1" />
               <MiniGauge label="Precio" score={analysis.price_score} icon={DollarSign} color="#f59e0b" />
               <MiniGauge label="Calidad" score={analysis.quality_gap_score} icon={Star} color="#ef4444" />
+              <MiniGauge label="Viabilidad" score={analysis.entrant_viability_score} icon={Target} color="#8b5cf6" />
             </div>
           </div>
 
           {/* Extended metrics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              { l: "Ingreso Est/Mes", v: analysis.revenue_estimate ? `$${Math.round(analysis.revenue_estimate).toLocaleString()}` : "--", c: "#10b981" },
-              { l: "Margen Estimado", v: analysis.estimated_margin != null ? `${analysis.estimated_margin}%` : "--", c: analysis.estimated_margin != null && analysis.estimated_margin >= 30 ? "#10b981" : analysis.estimated_margin != null && analysis.estimated_margin >= 20 ? "#f59e0b" : "#ef4444" },
-              { l: "Reviews Mediana", v: analysis.median_reviews?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? "--", c: "#6366f1" },
-              { l: "Rango Precio", v: `$${analysis.min_price?.toFixed(0) ?? "?"} - $${analysis.max_price?.toFixed(0) ?? "?"}`, c: "var(--text-primary)" },
-              { l: "% Con Ventas", v: analysis.monthly_bought_percentage != null ? `${analysis.monthly_bought_percentage}%` : "--", c: "#f97316" },
-              { l: "% Best Seller", v: analysis.best_seller_percentage != null ? `${analysis.best_seller_percentage}%` : "--", c: "#f97316" },
-              { l: "% Amazon Choice", v: analysis.amazon_choice_percentage != null ? `${analysis.amazon_choice_percentage}%` : "--", c: "#10b981" },
-              { l: "Resultados Amazon", v: analysis.search_result_count ? analysis.search_result_count.toLocaleString() : "--", c: "var(--text-primary)" },
-            ].map((m) => (
+            {([
+              { l: "Revenue Entrada", v: analysis.revenue_entry ? `$${Math.round(analysis.revenue_entry).toLocaleString()}` : "--", c: "#f97316", sub: "Nuevo vendedor" },
+              { l: "Revenue Medio", v: analysis.revenue_estimate ? `$${Math.round(analysis.revenue_estimate).toLocaleString()}` : "--", c: "#6366f1", sub: "Vendedor establecido" },
+              { l: "Revenue Top", v: analysis.revenue_top ? `$${Math.round(analysis.revenue_top).toLocaleString()}` : "--", c: "#10b981", sub: "Líderes del nicho" },
+              { l: "Margen Estimado", v: analysis.estimated_margin != null ? `${analysis.estimated_margin}%` : "--", c: analysis.estimated_margin != null && analysis.estimated_margin >= 30 ? "#10b981" : analysis.estimated_margin != null && analysis.estimated_margin >= 20 ? "#f59e0b" : "#ef4444", sub: "" },
+              { l: "Reviews Mediana", v: analysis.median_reviews?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? "--", c: "#6366f1", sub: "" },
+              { l: "Rango Precio", v: `$${analysis.min_price?.toFixed(0) ?? "?"} - $${analysis.max_price?.toFixed(0) ?? "?"}`, c: "var(--text-primary)", sub: "" },
+              { l: "% Con Ventas", v: analysis.monthly_bought_percentage != null ? `${analysis.monthly_bought_percentage}%` : "--", c: "#f97316", sub: "" },
+              { l: "Resultados Amazon", v: analysis.search_result_count ? analysis.search_result_count.toLocaleString() : "--", c: "var(--text-primary)", sub: "" },
+            ] as { l: string; v: string; c: string; sub: string }[]).map((m) => (
               <div key={m.l} className="p-3 rounded-xl" style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)" }}>
                 <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>{m.l}</p>
                 <p className="text-sm font-bold mt-0.5" style={{ color: m.c }}>{m.v}</p>
+                {m.sub && <p className="text-[8px]" style={{ color: "var(--text-muted)" }}>{m.sub}</p>}
               </div>
             ))}
           </div>
@@ -770,6 +772,7 @@ export default function AnalysisDetailPage() {
               <BreakdownSection title="Competencia" icon={Users} color="#6366f1" score={analysis.competition_score} breakdown={analysis.competition_breakdown} />
               <BreakdownSection title="Precio" icon={DollarSign} color="#f59e0b" score={analysis.price_score} breakdown={analysis.price_breakdown} />
               <BreakdownSection title="Calidad" icon={Star} color="#ef4444" score={analysis.quality_gap_score} breakdown={analysis.quality_breakdown} />
+              <BreakdownSection title="Viabilidad Entrante" icon={Target} color="#8b5cf6" score={analysis.entrant_viability_score} breakdown={analysis.entrant_viability_breakdown} />
             </div>
           </div>
 
@@ -828,8 +831,8 @@ export default function AnalysisDetailPage() {
               <div className="table-wrap">
                 <table>
                   <thead><tr>
-                    <th>Rango</th><th style={{ textAlign: "right" }}>Productos</th><th style={{ textAlign: "right" }}>Reviews</th>
-                    <th style={{ textAlign: "right" }}>Rating</th><th style={{ textAlign: "center" }}>Demanda</th><th style={{ textAlign: "center" }}>Facilidad</th>
+                    <th>Rango</th><th style={{ textAlign: "right" }}>Productos</th><th style={{ textAlign: "right" }}>Reviews (med)</th>
+                    <th style={{ textAlign: "right" }}>Rating</th><th style={{ textAlign: "right" }}>Pequeños</th><th style={{ textAlign: "center" }}>Demanda</th><th style={{ textAlign: "center" }}>Facilidad</th>
                   </tr></thead>
                   <tbody>
                     {analysis.price_opportunity.ranges.map((r) => (
@@ -838,6 +841,11 @@ export default function AnalysisDetailPage() {
                         <td style={{ textAlign: "right" }}>{r.count}</td>
                         <td style={{ textAlign: "right" }}>{r.avg_reviews.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
                         <td style={{ textAlign: "right" }}>{r.avg_rating?.toFixed(1) ?? "--"}</td>
+                        <td style={{ textAlign: "right" }}>
+                          <span className="text-[10px] font-bold" style={{ color: (r.small_sellers ?? 0) >= 3 ? "#10b981" : "var(--text-muted)" }}>
+                            {r.small_sellers ?? "--"}
+                          </span>
+                        </td>
                         <td style={{ textAlign: "center" }}>
                           {r.has_demand
                             ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: "rgba(16,185,129,0.1)", color: "#10b981" }}>Sí</span>

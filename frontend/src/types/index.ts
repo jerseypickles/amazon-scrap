@@ -58,6 +58,7 @@ export interface PriceOpportunityRange {
   avg_rating: number | null;
   has_demand: boolean;
   entry_ease: string;
+  small_sellers?: number;
 }
 
 export interface PriceOpportunity {
@@ -90,7 +91,10 @@ export interface NicheAnalysis {
   competition_score: number | null;
   price_score: number | null;
   quality_gap_score: number | null;
+  entrant_viability_score: number | null;
   revenue_estimate: number | null;
+  revenue_top: number | null;
+  revenue_entry: number | null;
   median_reviews: number | null;
   prime_percentage: number | null;
   monthly_bought_percentage: number | null;
@@ -102,6 +106,7 @@ export interface NicheAnalysis {
   competition_breakdown: ScoreBreakdown[];
   price_breakdown: ScoreBreakdown[];
   quality_breakdown: ScoreBreakdown[];
+  entrant_viability_breakdown: ScoreBreakdown[];
   saturation: SaturationData | null;
   price_opportunity: PriceOpportunity | null;
   price_distribution: PriceRange[];

@@ -48,7 +48,10 @@ class NicheAnalysisResponse(BaseModel):
     competition_score: float | None = None
     price_score: float | None = None
     quality_gap_score: float | None = None
+    entrant_viability_score: float | None = None
     revenue_estimate: float | None = None
+    revenue_top: float | None = None
+    revenue_entry: float | None = None
     # Extended metrics
     median_reviews: float | None = None
     prime_percentage: float | None = None
@@ -62,6 +65,7 @@ class NicheAnalysisResponse(BaseModel):
     competition_breakdown: list[dict] = []
     price_breakdown: list[dict] = []
     quality_breakdown: list[dict] = []
+    entrant_viability_breakdown: list[dict] = []
     # Market saturation
     saturation: dict | None = None
     # Price opportunity window

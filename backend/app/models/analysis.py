@@ -26,7 +26,10 @@ def new_analysis_doc(id: int, **fields) -> dict:
         "competition_score": fields.get("competition_score"),
         "price_score": fields.get("price_score"),
         "quality_gap_score": fields.get("quality_gap_score"),
+        "entrant_viability_score": fields.get("entrant_viability_score"),
         "revenue_estimate": fields.get("revenue_estimate"),
+        "revenue_top": fields.get("revenue_top"),
+        "revenue_entry": fields.get("revenue_entry"),
         "median_reviews": fields.get("median_reviews"),
         "prime_percentage": fields.get("prime_percentage"),
         "monthly_bought_percentage": fields.get("monthly_bought_percentage"),
@@ -38,6 +41,7 @@ def new_analysis_doc(id: int, **fields) -> dict:
         "competition_breakdown": fields.get("competition_breakdown"),
         "price_breakdown": fields.get("price_breakdown"),
         "quality_breakdown": fields.get("quality_breakdown"),
+        "entrant_viability_breakdown": fields.get("entrant_viability_breakdown"),
         "saturation": fields.get("saturation"),
         "price_opportunity": fields.get("price_opportunity"),
         "price_distribution": fields.get("price_distribution"),  # list of dicts

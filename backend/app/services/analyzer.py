@@ -151,31 +151,7 @@ class NicheAnalyzer:
         # Review distribution
         review_dist = self._calc_review_distribution(reviews)
 
-        # Opportunity scores — pass full product data + Keepa enrichment
-        demand_score, demand_bd = self._calc_demand_score(raw_products, reviews, prices, keepa_data)
-        competition_score, competition_bd = self._calc_competition_score(
-            raw_products, reviews, brand_count, top3_share, keepa_data,
-        )
-        price_score, price_bd = self._calc_price_score(prices, avg_price, median_price, keepa_data)
-        quality_gap_score, quality_bd = self._calc_quality_gap_score(ratings, reviews, keepa_data)
-
-        opportunity_score = round(
-            (demand_score * 0.30)
-            + (competition_score * 0.30)
-            + (price_score * 0.20)
-            + (quality_gap_score * 0.20),
-            1,
-        )
-
-        logger.info(
-            "Scores for '%s': demand=%.1f, competition=%.1f, price=%.1f, quality=%.1f → opportunity=%.1f",
-            keyword, demand_score, competition_score, price_score, quality_gap_score, opportunity_score,
-        )
-
-        # Revenue estimate — use median price (resistant to outliers)
-        revenue_estimate = self._estimate_monthly_revenue(raw_products, median_price or avg_price, keepa_data)
-
-        # Extended metrics
+        # Extended metrics (calculated before scores so margin is available)
         n = len(raw_products)
         median_reviews_val = round(statistics.median(reviews), 1) if reviews else None
         prime_pct = round(sum(1 for p in raw_products if p.get("is_prime")) / n * 100, 1) if n else None
@@ -196,6 +172,39 @@ class NicheAnalyzer:
         # Price opportunity window
         price_opportunity = self._calc_price_opportunity(raw_products, prices, reviews)
 
+        # Revenue estimate — 3 tiers (top/mid/entry)
+        ref_price = median_price or avg_price
+        revenue_tiers = self._estimate_revenue_tiers(raw_products, ref_price, keepa_data)
+        revenue_estimate = revenue_tiers["revenue_mid"]
+
+        # Opportunity scores — pass full product data + Keepa enrichment
+        demand_score, demand_bd = self._calc_demand_score(raw_products, reviews, prices, keepa_data)
+        competition_score, competition_bd = self._calc_competition_score(
+            raw_products, reviews, brand_count, top3_share, keepa_data,
+        )
+        price_score, price_bd = self._calc_price_score(prices, avg_price, median_price, keepa_data)
+        quality_gap_score, quality_bd = self._calc_quality_gap_score(ratings, reviews, keepa_data)
+
+        # Entrant viability — can a new small seller make money?
+        entrant_viability_score, entrant_viability_bd = self._calc_entrant_viability_score(
+            raw_products, ref_price, estimated_margin, revenue_tiers, price_opportunity,
+        )
+
+        # Final opportunity score: 30% Demand + 25% Competition + 25% Price + 10% Quality + 10% Entrant
+        opportunity_score = round(
+            (demand_score * 0.30)
+            + (competition_score * 0.25)
+            + (price_score * 0.25)
+            + (quality_gap_score * 0.10)
+            + (entrant_viability_score * 0.10),
+            1,
+        )
+
+        logger.info(
+            "Scores for '%s': demand=%.1f, competition=%.1f, price=%.1f, quality=%.1f, entrant=%.1f → opportunity=%.1f",
+            keyword, demand_score, competition_score, price_score, quality_gap_score, entrant_viability_score, opportunity_score,
+        )
+
         # 4. Save or update analysis — store lists natively (no JSON strings)
         metrics = dict(
             total_products=len(raw_products),
@@ -213,8 +222,11 @@ class NicheAnalyzer:
             competition_score=round(competition_score, 1),
             price_score=round(price_score, 1),
             quality_gap_score=round(quality_gap_score, 1),
+            entrant_viability_score=round(entrant_viability_score, 1),
             revenue_estimate=round(revenue_estimate, 2) if revenue_estimate else None,
-            # New fields
+            revenue_top=round(revenue_tiers["revenue_top"], 2) if revenue_tiers["revenue_top"] else None,
+            revenue_entry=round(revenue_tiers["revenue_entry"], 2) if revenue_tiers["revenue_entry"] else None,
+            # Extended
             median_reviews=median_reviews_val,
             prime_percentage=prime_pct,
             monthly_bought_percentage=bought_pct,
@@ -226,6 +238,7 @@ class NicheAnalyzer:
             competition_breakdown=competition_bd,
             price_breakdown=price_bd,
             quality_breakdown=quality_bd,
+            entrant_viability_breakdown=entrant_viability_bd,
             saturation=saturation,
             price_opportunity=price_opportunity,
             # Distributions
@@ -530,30 +543,31 @@ class NicheAnalyzer:
         else:
             w_leaders, w_conc, w_div, w_badges, w_gap = 35, 25, 15, 15, 10
 
-        # --- Signal 1: How entrenched are the leaders? ---
+        # --- Signal 1: Small seller viability ---
+        # How many products with <500 reviews are actively selling?
+        # This matters more than how big the leaders are.
         sorted_reviews = sorted(reviews, reverse=True) if reviews else []
-        top10_reviews = sorted_reviews[:10]
-        if top10_reviews:
-            median_top10 = statistics.median(top10_reviews)
-            if median_top10 < 100:
-                leader_score = 90
-            elif median_top10 < 300:
-                leader_score = 75
-            elif median_top10 < 800:
-                leader_score = 60
-            elif median_top10 < 2000:
-                leader_score = 40
-            elif median_top10 < 5000:
-                leader_score = 25
-            else:
-                leader_score = 10
-            signal_val = round(leader_score * w_leaders / 100, 1)
-            score += signal_val
-            breakdown.append({"signal": "Líderes Atrincherados", "value": f"{median_top10:,.0f} reviews mediana top-10", "score": leader_score, "weight": w_leaders, "weighted": signal_val})
+        small_sellers_active = sum(
+            1 for p in products
+            if (p.get("reviews_count") or 0) < 500 and p.get("monthly_bought")
+        )
+        small_ratio_pct = (small_sellers_active / n * 100) if n else 0
+
+        if small_ratio_pct >= 30:
+            viability_score = 90
+        elif small_ratio_pct >= 20:
+            viability_score = 75
+        elif small_ratio_pct >= 15:
+            viability_score = 60
+        elif small_ratio_pct >= 10:
+            viability_score = 45
+        elif small_ratio_pct >= 5:
+            viability_score = 30
         else:
-            signal_val = round(50 * w_leaders / 100, 1)
-            score += signal_val
-            breakdown.append({"signal": "Líderes Atrincherados", "value": "Sin datos", "score": 50, "weight": w_leaders, "weighted": signal_val})
+            viability_score = 15
+        signal_val = round(viability_score * w_leaders / 100, 1)
+        score += signal_val
+        breakdown.append({"signal": "Viabilidad del Pequeño", "value": f"{small_sellers_active} vendedores <500 rev vendiendo ({small_ratio_pct:.0f}%)", "score": viability_score, "weight": w_leaders, "weighted": signal_val})
 
         # --- Signal 2: Brand concentration ---
         if top3_share is not None:
@@ -827,7 +841,7 @@ class NicheAnalyzer:
         elif pct_under_4 >= 3:
             dissatisfaction_score = 20
         else:
-            dissatisfaction_score = 10
+            dissatisfaction_score = 40  # Uniform high quality ≠ no opportunity
         signal_val = round(dissatisfaction_score * w_under4 / 100, 1)
         score += signal_val
         breakdown.append({"signal": "Productos <4.0 Estrellas", "value": f"{pct_under_4:.0f}% ({under_4}/{n})", "score": dissatisfaction_score, "weight": w_under4, "weighted": signal_val})
@@ -852,7 +866,7 @@ class NicheAnalyzer:
             elif bad_weight_pct >= 3:
                 weighted_score = 30
             else:
-                weighted_score = 10
+                weighted_score = 35  # Low dissatisfaction = match quality, not a blocker
             signal_val = round(weighted_score * w_weighted / 100, 1)
             score += signal_val
             breakdown.append({"signal": "Insatisfacción Ponderada", "value": f"{bad_weight_pct:.0f}% reviews en productos <4.0", "score": weighted_score, "weight": w_weighted, "weighted": signal_val})
@@ -869,7 +883,7 @@ class NicheAnalyzer:
             elif avg_rating < 4.4:
                 fb = 20
             else:
-                fb = 10
+                fb = 35  # High avg rating = quality bar is clear, not a blocker
             signal_val = round(fb * w_weighted / 100, 1)
             score += signal_val
             breakdown.append({"signal": "Insatisfacción Ponderada", "value": f"Rating prom {avg_rating:.1f}", "score": fb, "weight": w_weighted, "weighted": signal_val})
@@ -887,7 +901,7 @@ class NicheAnalyzer:
         elif pct_under_43 >= 20:
             moderate_score = 35
         else:
-            moderate_score = 15
+            moderate_score = 30  # High quality bar but achievable
         signal_val = round(moderate_score * w_under43 / 100, 1)
         score += signal_val
         breakdown.append({"signal": "Productos <4.3 Estrellas", "value": f"{pct_under_43:.0f}% ({under_43}/{n})", "score": moderate_score, "weight": w_under43, "weighted": signal_val})
@@ -933,6 +947,96 @@ class NicheAnalyzer:
             score += signal_val
             direction_label = re["verdict"]
             breakdown.append({"signal": "Evolución Ratings (Keepa)", "value": f"{change:+.2f} estrellas, {declining_pct:.0f}% cayendo", "score": evo_score, "weight": w_evolution, "weighted": signal_val})
+
+        return round(min(max(score, 0), 100), 1), breakdown
+
+    def _calc_entrant_viability_score(
+        self, products: list[dict], price: float | None,
+        estimated_margin: float | None,
+        revenue_tiers: dict,
+        price_opportunity: dict | None,
+    ) -> tuple[float, list[dict]]:
+        """Entrant Viability = can a NEW small seller make money here?
+        HIGH score = realistic path to profit for a newcomer.
+        """
+        breakdown = []
+        if not products:
+            return 40.0, []
+
+        score = 0.0
+        w_profit, w_survivors, w_entry = 40, 30, 30
+
+        # --- Signal 1: Estimated monthly profit for new entrant ---
+        entry_rev = revenue_tiers.get("revenue_entry")
+        margin_pct = estimated_margin or 0
+        if entry_rev and margin_pct > 0:
+            monthly_profit = entry_rev * (margin_pct / 100)
+            if monthly_profit >= 3000:
+                profit_score = 90
+            elif monthly_profit >= 1500:
+                profit_score = 75
+            elif monthly_profit >= 800:
+                profit_score = 60
+            elif monthly_profit >= 400:
+                profit_score = 45
+            elif monthly_profit >= 200:
+                profit_score = 30
+            else:
+                profit_score = 15
+            signal_val = round(profit_score * w_profit / 100, 1)
+            score += signal_val
+            breakdown.append({"signal": "Ganancia Estimada Entrante", "value": f"~${monthly_profit:,.0f}/mes ({margin_pct:.0f}% margen)", "score": profit_score, "weight": w_profit, "weighted": signal_val})
+        else:
+            signal_val = round(30 * w_profit / 100, 1)
+            score += signal_val
+            breakdown.append({"signal": "Ganancia Estimada Entrante", "value": "Sin datos suficientes", "score": 30, "weight": w_profit, "weighted": signal_val})
+
+        # --- Signal 2: Small seller survivors ---
+        # Products with <500 reviews that show monthly_bought = small sellers making sales
+        n = len(products)
+        small_with_sales = sum(
+            1 for p in products
+            if (p.get("reviews_count") or 0) < 500 and p.get("monthly_bought")
+        )
+        small_ratio = small_with_sales / n if n else 0
+        small_pct = small_ratio * 100
+
+        if small_pct >= 30:
+            surv_score = 90
+        elif small_pct >= 20:
+            surv_score = 75
+        elif small_pct >= 15:
+            surv_score = 60
+        elif small_pct >= 10:
+            surv_score = 45
+        elif small_pct >= 5:
+            surv_score = 30
+        else:
+            surv_score = 15
+        signal_val = round(surv_score * w_survivors / 100, 1)
+        score += signal_val
+        breakdown.append({"signal": "Vendedores Pequeños Activos", "value": f"{small_with_sales} de {n} productos ({small_pct:.0f}% <500 rev vendiendo)", "score": surv_score, "weight": w_survivors, "weighted": signal_val})
+
+        # --- Signal 3: Best entry ease across price ranges ---
+        ranges = (price_opportunity or {}).get("ranges", [])
+        best_ease = "Difícil"
+        for r in ranges:
+            ease = r.get("entry_ease", "Difícil")
+            if ease == "Fácil":
+                best_ease = "Fácil"
+                break
+            elif ease == "Moderado":
+                best_ease = "Moderado"
+
+        if best_ease == "Fácil":
+            ease_score = 85
+        elif best_ease == "Moderado":
+            ease_score = 55
+        else:
+            ease_score = 20
+        signal_val = round(ease_score * w_entry / 100, 1)
+        score += signal_val
+        breakdown.append({"signal": "Mejor Facilidad de Entrada", "value": best_ease, "score": ease_score, "weight": w_entry, "weighted": signal_val})
 
         return round(min(max(score, 0), 100), 1), breakdown
 
@@ -993,15 +1097,16 @@ class NicheAnalyzer:
                 continue
             count = len(bucket_products)
             rev_vals = [p.get("reviews_count") or 0 for p in bucket_products]
-            avg_rev = statistics.mean(rev_vals) if rev_vals else 0
+            median_rev = statistics.median(rev_vals) if rev_vals else 0
             rat_vals = [p["rating"] for p in bucket_products if p.get("rating") is not None]
             avg_rat = statistics.mean(rat_vals) if rat_vals else 0
             has_bought = sum(1 for p in bucket_products if p.get("monthly_bought"))
+            small_sellers = sum(1 for p in bucket_products if (p.get("reviews_count") or 0) < 300)
 
-            # Opportunity = low avg reviews (easy entry) + some demand (has_bought > 0)
-            if avg_rev < 200:
+            # Opportunity = low median reviews (easy entry) + some demand
+            if median_rev < 150:
                 entry_ease = "Fácil"
-            elif avg_rev < 800:
+            elif median_rev < 500:
                 entry_ease = "Moderado"
             else:
                 entry_ease = "Difícil"
@@ -1009,10 +1114,11 @@ class NicheAnalyzer:
             ranges.append({
                 "range": label,
                 "count": count,
-                "avg_reviews": round(avg_rev, 0),
+                "avg_reviews": round(median_rev, 0),
                 "avg_rating": round(avg_rat, 2) if avg_rat else None,
                 "has_demand": has_bought > 0,
                 "entry_ease": entry_ease,
+                "small_sellers": small_sellers,
             })
 
         # Find best range: low avg_reviews + has_demand + count > 1
@@ -1038,39 +1144,66 @@ class NicheAnalyzer:
         self, products: list[dict], price: float | None,
         keepa: dict | None = None,
     ) -> float | None:
-        """Estimate monthly revenue per seller.
+        """Estimate monthly revenue (mid-tier / median seller).
 
-        Uses median price (outlier-resistant) × estimated units.
-        Priority:
-        1. Keepa BSR-based sales estimate (most reliable)
-        2. Scraper "monthly_bought" text
-        3. Review-to-sales ratio fallback
+        Backwards-compatible: returns the mid-tier (percentile 50) value.
+        For all 3 tiers use _estimate_revenue_tiers().
         """
+        tiers = self._estimate_revenue_tiers(products, price, keepa)
+        return tiers["revenue_mid"]
+
+    def _estimate_revenue_tiers(
+        self, products: list[dict], price: float | None,
+        keepa: dict | None = None,
+    ) -> dict:
+        """Estimate 3 revenue tiers: top (p90), mid (p50), entry (p25).
+
+        Returns dict with revenue_top, revenue_mid, revenue_entry (all float|None).
+        """
+        empty = {"revenue_top": None, "revenue_mid": None, "revenue_entry": None}
         if not price or not products:
-            return None
+            return empty
 
-        # 1. Keepa BSR-based estimate
-        if keepa and keepa.get("sales_estimate"):
-            median_units = keepa["sales_estimate"]["median_monthly_units"]
-            if median_units > 0:
-                return round(median_units * price, 2)
+        # Collect per-product unit estimates
+        unit_estimates: list[float] = []
 
-        # 2. Scraper monthly_bought text
-        bought_texts = [p["monthly_bought"] for p in products if p.get("monthly_bought")]
-        if bought_texts:
-            bought_nums = [self._parse_monthly_bought(t) for t in bought_texts]
-            if bought_nums:
-                median_monthly_units = statistics.median(bought_nums)
-                return round(median_monthly_units * price, 2)
+        # Priority 1: per-product monthly_bought text from scraper
+        for p in products:
+            if p.get("monthly_bought"):
+                units = self._parse_monthly_bought(p["monthly_bought"])
+                if units > 0:
+                    unit_estimates.append(units)
 
-        # 3. Fallback: review-to-sales ratio (~1 review per 20 sales, last 12 months)
-        reviews = [p["reviews_count"] for p in products if p.get("reviews_count") is not None and p["reviews_count"] > 0]
-        if reviews:
-            median_reviews = statistics.median(reviews)
-            estimated_monthly_units = (median_reviews / 24) * 20
-            return round(estimated_monthly_units * price, 2)
+        # Priority 2: if we have very few scraper estimates, try review-to-sales fallback
+        if len(unit_estimates) < 5:
+            for p in products:
+                rc = p.get("reviews_count")
+                if rc is not None and rc > 0 and not p.get("monthly_bought"):
+                    estimated = (rc / 24) * 20  # ~1 review per 20 sales, annualized
+                    unit_estimates.append(estimated)
 
-        return None
+        if not unit_estimates:
+            return empty
+
+        unit_estimates.sort()
+        n = len(unit_estimates)
+
+        def percentile(data: list[float], pct: float) -> float:
+            idx = (pct / 100) * (len(data) - 1)
+            lo = int(idx)
+            hi = min(lo + 1, len(data) - 1)
+            frac = idx - lo
+            return data[lo] * (1 - frac) + data[hi] * frac
+
+        p25 = percentile(unit_estimates, 25)
+        p50 = percentile(unit_estimates, 50)
+        p90 = percentile(unit_estimates, 90)
+
+        return {
+            "revenue_top": round(p90 * price, 2),
+            "revenue_mid": round(p50 * price, 2),
+            "revenue_entry": round(p25 * price, 2),
+        }
 
     async def quick_check(self, keyword: str) -> dict:
         """Quick 1-page scrape to get real competitive data for a sub-niche.
@@ -1270,7 +1403,10 @@ class NicheAnalyzer:
             competition_score=a.get("competition_score"),
             price_score=a.get("price_score"),
             quality_gap_score=a.get("quality_gap_score"),
+            entrant_viability_score=a.get("entrant_viability_score"),
             revenue_estimate=a.get("revenue_estimate"),
+            revenue_top=a.get("revenue_top"),
+            revenue_entry=a.get("revenue_entry"),
             median_reviews=a.get("median_reviews"),
             prime_percentage=a.get("prime_percentage"),
             monthly_bought_percentage=a.get("monthly_bought_percentage"),
@@ -1282,6 +1418,7 @@ class NicheAnalyzer:
             competition_breakdown=a.get("competition_breakdown") or [],
             price_breakdown=a.get("price_breakdown") or [],
             quality_breakdown=a.get("quality_breakdown") or [],
+            entrant_viability_breakdown=a.get("entrant_viability_breakdown") or [],
             saturation=a.get("saturation"),
             price_opportunity=a.get("price_opportunity"),
             price_distribution=price_distribution,
