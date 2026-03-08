@@ -389,7 +389,17 @@ export interface UserProfile {
   experience: string; // "beginner" | "intermediate" | "advanced"
   fulfillment: string; // "fba" | "fbm" | "both"
   marketplace: string; // "US" | "MX" | "CA" | "UK" | "DE"
+  risk_tolerance: string; // "conservador" | "moderado" | "agresivo"
+  target_monthly_profit: number;
   updated_at?: string | null;
+}
+
+export interface SavedProfile {
+  id: string;
+  name: string;
+  profile: UserProfile;
+  is_active: boolean;
+  created_at: string | null;
 }
 
 // ASIN Tracker types

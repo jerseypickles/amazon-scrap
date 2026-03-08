@@ -172,6 +172,8 @@ PRESUPUESTO DISPONIBLE: ${b:,}
         product_type = profile.product_type
         fulfillment = profile.fulfillment
         experience = profile.experience
+        risk = getattr(profile, "risk_tolerance", "moderado")
+        target_profit = getattr(profile, "target_monthly_profit", 2000)
 
         sections = []
 
@@ -202,6 +204,15 @@ PRESUPUESTO DISPONIBLE: ${b:,}
             sections.append("EXPERIENCIA: Avanzado. Sé directo, profundiza en estrategia.")
 
         sections.append(f"PRESUPUESTO: ${b:,} USD")
+
+        if risk == "conservador":
+            sections.append("TOLERANCIA AL RIESGO: CONSERVADOR — Prioriza nichos con competencia baja-media, breakeven rápido (<6 meses), margen >35%. Evita nichos saturados o con inversión alta. Recomienda solo opciones seguras.")
+        elif risk == "agresivo":
+            sections.append("TOLERANCIA AL RIESGO: AGRESIVO — Acepta nichos competitivos si el margen/revenue lo justifica. OK con breakeven largo (hasta 12 meses). Evalúa nichos de alto volumen aunque requieran más inversión.")
+        else:
+            sections.append("TOLERANCIA AL RIESGO: MODERADO — Balance entre seguridad y oportunidad. Breakeven <9 meses. Acepta competencia media si hay espacio claro para entrar.")
+
+        sections.append(f"META DE GANANCIA MENSUAL: ${target_profit:,} USD — Evalúa si el revenue de entrada y margen del nicho pueden alcanzar esta meta. Si no es suficiente, dilo claro.")
 
         return "\n".join(sections)
 

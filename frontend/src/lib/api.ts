@@ -277,3 +277,23 @@ export async function updateUserProfile(profile: Omit<UserProfile, "updated_at">
     body: JSON.stringify(profile),
   });
 }
+
+// Saved Profiles
+export async function getSavedProfiles(): Promise<import("@/types").SavedProfile[]> {
+  return fetchAPI("/profile/saved");
+}
+
+export async function createSavedProfile(name: string, profile: Omit<UserProfile, "updated_at">): Promise<import("@/types").SavedProfile> {
+  return fetchAPI("/profile/saved", {
+    method: "POST",
+    body: JSON.stringify({ name, profile }),
+  });
+}
+
+export async function loadSavedProfile(profileId: string): Promise<{ ok: boolean; loaded: string }> {
+  return fetchAPI(`/profile/saved/${profileId}/load`, { method: "POST" });
+}
+
+export async function deleteSavedProfile(profileId: string): Promise<{ ok: boolean }> {
+  return fetchAPI(`/profile/saved/${profileId}`, { method: "DELETE" });
+}

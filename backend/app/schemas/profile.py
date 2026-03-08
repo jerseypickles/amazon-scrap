@@ -17,7 +17,23 @@ class UserProfile(BaseModel):
     fulfillment: str = "fba"  # "fba" | "fbm" | "both"
     # Target marketplace
     marketplace: str = "US"  # "US" | "MX" | "CA" | "UK" | "DE"
+    # Risk tolerance
+    risk_tolerance: str = "moderado"  # "conservador" | "moderado" | "agresivo"
+    # Target monthly profit
+    target_monthly_profit: int = 2000  # USD
 
 
 class UserProfileResponse(UserProfile):
     updated_at: str | None = None
+
+
+class SavedProfile(BaseModel):
+    """A named saved profile."""
+    name: str
+    profile: UserProfile
+
+
+class SavedProfileResponse(SavedProfile):
+    id: str
+    is_active: bool = False
+    created_at: str | None = None
