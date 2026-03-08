@@ -106,6 +106,16 @@ def new_tracked_product_doc(id: int, **fields) -> dict:
         "buy_box_seller": fields.get("buy_box_seller"),
         "lowest_offer_price": fields.get("lowest_offer_price"),
         "fba_seller_count": fields.get("fba_seller_count"),
+        # Keepa historical data
+        "keepa_trend": fields.get("keepa_trend"),
+        "keepa_seasonality": fields.get("keepa_seasonality"),
+        "keepa_price_stability": fields.get("keepa_price_stability"),
+        "keepa_seller_dynamics": fields.get("keepa_seller_dynamics"),
+        "keepa_rating_evolution": fields.get("keepa_rating_evolution"),
+        "keepa_sales_estimate": fields.get("keepa_sales_estimate"),
+        "keepa_data_confidence": fields.get("keepa_data_confidence"),
+        "keepa_products_analyzed": fields.get("keepa_products_analyzed"),
+        "keepa_last_updated": fields.get("keepa_last_updated"),
         # Tracking metadata
         "snapshots": initial_snapshot,
         "check_interval_hours": fields.get("check_interval_hours", 24),

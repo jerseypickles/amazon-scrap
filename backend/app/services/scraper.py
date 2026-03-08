@@ -731,12 +731,66 @@ class AmazonScraper:
         if feat_el:
             features = " | ".join(f.get_text(strip=True) for f in feat_el[:5])
 
+        # Images — extract from landing image and thumbnails
+        images: list[str] = []
+        # Main product image
+        main_img = soup.select_one("#landingImage") or soup.select_one("#imgBlkFront")
+        if main_img:
+            src = main_img.get("data-old-hires") or main_img.get("src") or ""
+            if src and src.startswith("http"):
+                images.append(src)
+        # Thumbnail strip images (higher resolution via data-old-hires)
+        for thumb in soup.select("#altImages img, #imageBlock img"):
+            src = thumb.get("data-old-hires") or thumb.get("src") or ""
+            if src and src.startswith("http") and src not in images and "sprite" not in src:
+                images.append(src)
+            if len(images) >= 8:
+                break
+
+        # Title
+        title = None
+        title_el = soup.select_one("#productTitle")
+        if title_el:
+            title = title_el.get_text(strip=True)
+
+        # Price
+        price = None
+        price_el = soup.select_one(".a-price .a-offscreen") or soup.select_one("#priceblock_ourprice")
+        if price_el:
+            try:
+                price = float(price_el.get_text(strip=True).replace("$", "").replace(",", ""))
+            except ValueError:
+                pass
+
+        # Rating
+        rating = None
+        rating_el = soup.select_one("#acrPopover .a-icon-alt")
+        if rating_el:
+            try:
+                rating = float(rating_el.get_text(strip=True).split()[0])
+            except (ValueError, IndexError):
+                pass
+
+        # Total reviews
+        total_reviews = None
+        reviews_el = soup.select_one("#acrCustomerReviewText")
+        if reviews_el:
+            try:
+                total_reviews = int(reviews_el.get_text(strip=True).split()[0].replace(",", ""))
+            except (ValueError, IndexError):
+                pass
+
         return {
             "asin": asin,
+            "title": title,
+            "price": price,
+            "rating": rating,
+            "total_reviews": total_reviews,
             "bsr": bsr,
             "bsr_category": bsr_category,
             "description": description,
             "features": features,
+            "images": images or None,
         }
 
 

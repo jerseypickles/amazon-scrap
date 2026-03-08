@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import app.database as _database
 from app.models.watchlist import new_notification_doc, new_tracked_product_doc
 from app.services.scraper import scraper
+from app.services.keepa_service import keepa_service
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +109,17 @@ class ProductTracker:
             except Exception as e:
                 logger.warning("Could not fetch offers for %s: %s", asin, e)
 
+        # Fetch Keepa historical data (90-day history from day 1)
+        keepa_data: dict = {}
+        if keepa_service.enabled:
+            try:
+                enrichment = await keepa_service.enrich_asins([asin], days=90)
+                if enrichment:
+                    keepa_data = enrichment
+                    logger.info("Keepa enrichment for %s: confidence=%s%%", asin, enrichment.get("data_confidence", 0))
+            except Exception as e:
+                logger.warning("Keepa enrichment failed for %s: %s", asin, e)
+
         pid = await _database.get_next_id("tracked_products")
         doc = new_tracked_product_doc(
             pid,
@@ -157,6 +169,16 @@ class ProductTracker:
             # Offers data
             offers=offers_data or None,
             **offers_meta,
+            # Keepa historical data
+            keepa_trend=keepa_data.get("trend"),
+            keepa_seasonality=keepa_data.get("seasonality"),
+            keepa_price_stability=keepa_data.get("price_stability"),
+            keepa_seller_dynamics=keepa_data.get("seller_dynamics"),
+            keepa_rating_evolution=keepa_data.get("rating_evolution"),
+            keepa_sales_estimate=keepa_data.get("sales_estimate"),
+            keepa_data_confidence=keepa_data.get("data_confidence"),
+            keepa_products_analyzed=keepa_data.get("keepa_products_analyzed"),
+            keepa_last_updated=datetime.now(timezone.utc).isoformat() if keepa_data else None,
         )
         await _database.db.tracked_products.insert_one(doc)
 
@@ -367,6 +389,9 @@ class ProductTracker:
                 update_set["model_number"] = detail["model_number"]
             if detail.get("images"):
                 update_set["images"] = detail["images"]
+                # Set thumbnail from first image if not present
+                if not item.get("image_url") and detail["images"]:
+                    update_set["image_url"] = detail["images"][0]
             if detail.get("variations"):
                 update_set["variations"] = detail["variations"]
             if detail.get("top_reviews"):
@@ -412,6 +437,23 @@ class ProductTracker:
                     update_set["buy_box_seller"] = buy_box
         except Exception as e:
             logger.warning("Could not refresh offers for %s: %s", asin, e)
+
+        # Refresh Keepa historical data
+        if keepa_service.enabled:
+            try:
+                enrichment = await keepa_service.enrich_asins([asin], days=90)
+                if enrichment:
+                    update_set["keepa_trend"] = enrichment.get("trend")
+                    update_set["keepa_seasonality"] = enrichment.get("seasonality")
+                    update_set["keepa_price_stability"] = enrichment.get("price_stability")
+                    update_set["keepa_seller_dynamics"] = enrichment.get("seller_dynamics")
+                    update_set["keepa_rating_evolution"] = enrichment.get("rating_evolution")
+                    update_set["keepa_sales_estimate"] = enrichment.get("sales_estimate")
+                    update_set["keepa_data_confidence"] = enrichment.get("data_confidence")
+                    update_set["keepa_products_analyzed"] = enrichment.get("keepa_products_analyzed")
+                    update_set["keepa_last_updated"] = now.isoformat()
+            except Exception as e:
+                logger.warning("Keepa refresh failed for %s: %s", asin, e)
 
         await _database.db.tracked_products.update_one(
             {"_id": item["_id"]},

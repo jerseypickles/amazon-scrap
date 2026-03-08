@@ -456,6 +456,48 @@ export interface TrackedProduct {
   buy_box_seller: string | null;
   lowest_offer_price: number | null;
   fba_seller_count: number | null;
+  // Keepa historical data
+  keepa_trend: {
+    direction: string;
+    avg_bsr_change_pct: number;
+    products_improving: number;
+    products_declining: number;
+    products_stable: number;
+  } | null;
+  keepa_seasonality: {
+    bsr_volatility_ratio: number;
+    is_seasonal: boolean;
+    verdict: string;
+  } | null;
+  keepa_price_stability: {
+    avg_cv: number;
+    volatile_pct: number;
+    avg_price_change_pct: number;
+    prices_declining_pct: number;
+    verdict: string;
+  } | null;
+  keepa_seller_dynamics: {
+    avg_current_sellers: number;
+    avg_seller_change_pct: number;
+    sellers_increasing_pct: number;
+    sellers_decreasing_pct: number;
+    verdict: string;
+  } | null;
+  keepa_rating_evolution: {
+    avg_rating_change: number;
+    ratings_declining_pct: number;
+    verdict: string;
+  } | null;
+  keepa_sales_estimate: {
+    median_monthly_units: number;
+    avg_monthly_units: number;
+    min_monthly_units: number;
+    max_monthly_units: number;
+    source: string;
+  } | null;
+  keepa_data_confidence: number | null;
+  keepa_products_analyzed: number | null;
+  keepa_last_updated: string | null;
   // Tracking
   snapshots: ProductSnapshot[];
   check_interval_hours: number;

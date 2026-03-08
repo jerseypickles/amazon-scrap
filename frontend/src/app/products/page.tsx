@@ -201,6 +201,121 @@ function DetailPanel({ product, onClose }: { product: TrackedProduct; onClose: (
             </div>
           </div>
 
+          {/* Keepa Historical Data (90 days) */}
+          {product.keepa_data_confidence != null && product.keepa_data_confidence > 0 && (
+            <div className="card mb-4">
+              <p className="text-xs font-bold mb-3 flex items-center gap-1.5">
+                <TrendingUp size={12} color="#8b5cf6" /> Datos Historicos (90 dias)
+                <span className="ml-auto text-[9px] font-normal px-1.5 py-0.5 rounded-full" style={{ background: "rgba(139,92,246,0.12)", color: "#8b5cf6" }}>
+                  Keepa {product.keepa_data_confidence}% confianza
+                </span>
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {/* Demand Trend */}
+                {product.keepa_trend && (
+                  <div className="p-2.5 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
+                    <p className="text-[9px] font-bold uppercase mb-1" style={{ color: "var(--text-muted)" }}>Tendencia Demanda</p>
+                    <div className="flex items-center gap-1.5">
+                      {product.keepa_trend.direction === "growing" ? (
+                        <TrendingUp size={14} color="#10b981" />
+                      ) : product.keepa_trend.direction === "declining" ? (
+                        <TrendingDown size={14} color="#ef4444" />
+                      ) : (
+                        <Minus size={14} color="#6366f1" />
+                      )}
+                      <span className="text-sm font-black" style={{
+                        color: product.keepa_trend.direction === "growing" ? "#10b981" : product.keepa_trend.direction === "declining" ? "#ef4444" : "#6366f1"
+                      }}>
+                        {product.keepa_trend.direction === "growing" ? "Creciendo" : product.keepa_trend.direction === "declining" ? "Cayendo" : "Estable"}
+                      </span>
+                    </div>
+                    <p className="text-[9px] mt-1" style={{ color: "var(--text-muted)" }}>
+                      BSR {product.keepa_trend.avg_bsr_change_pct > 0 ? "+" : ""}{product.keepa_trend.avg_bsr_change_pct}%
+                    </p>
+                  </div>
+                )}
+
+                {/* Sales Estimate */}
+                {product.keepa_sales_estimate && (
+                  <div className="p-2.5 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
+                    <p className="text-[9px] font-bold uppercase mb-1" style={{ color: "var(--text-muted)" }}>Ventas Estimadas</p>
+                    <p className="text-sm font-black" style={{ color: "#f97316" }}>
+                      ~{product.keepa_sales_estimate.median_monthly_units.toLocaleString()}/mes
+                    </p>
+                    <p className="text-[9px] mt-1" style={{ color: "var(--text-muted)" }}>
+                      Rango: {product.keepa_sales_estimate.min_monthly_units} - {product.keepa_sales_estimate.max_monthly_units} uds
+                    </p>
+                  </div>
+                )}
+
+                {/* Price Stability */}
+                {product.keepa_price_stability && (
+                  <div className="p-2.5 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
+                    <p className="text-[9px] font-bold uppercase mb-1" style={{ color: "var(--text-muted)" }}>Estabilidad Precio</p>
+                    <p className="text-[10px] font-bold" style={{
+                      color: product.keepa_price_stability.avg_cv < 0.1 ? "#10b981" : product.keepa_price_stability.avg_cv < 0.2 ? "#f59e0b" : "#ef4444"
+                    }}>
+                      {product.keepa_price_stability.verdict}
+                    </p>
+                    <p className="text-[9px] mt-1" style={{ color: "var(--text-muted)" }}>
+                      Variacion: {(product.keepa_price_stability.avg_cv * 100).toFixed(1)}% | Cambio: {product.keepa_price_stability.avg_price_change_pct > 0 ? "+" : ""}{product.keepa_price_stability.avg_price_change_pct}%
+                    </p>
+                  </div>
+                )}
+
+                {/* Seller Dynamics */}
+                {product.keepa_seller_dynamics && (
+                  <div className="p-2.5 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
+                    <p className="text-[9px] font-bold uppercase mb-1" style={{ color: "var(--text-muted)" }}>Dinamica Sellers</p>
+                    <p className="text-[10px] font-bold" style={{
+                      color: product.keepa_seller_dynamics.avg_seller_change_pct > 20 ? "#ef4444" : product.keepa_seller_dynamics.avg_seller_change_pct < -20 ? "#10b981" : "#6366f1"
+                    }}>
+                      {product.keepa_seller_dynamics.verdict}
+                    </p>
+                    <p className="text-[9px] mt-1" style={{ color: "var(--text-muted)" }}>
+                      Promedio: {product.keepa_seller_dynamics.avg_current_sellers} sellers | {product.keepa_seller_dynamics.avg_seller_change_pct > 0 ? "+" : ""}{product.keepa_seller_dynamics.avg_seller_change_pct}%
+                    </p>
+                  </div>
+                )}
+
+                {/* Rating Evolution */}
+                {product.keepa_rating_evolution && (
+                  <div className="p-2.5 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
+                    <p className="text-[9px] font-bold uppercase mb-1" style={{ color: "var(--text-muted)" }}>Evolucion Rating</p>
+                    <p className="text-[10px] font-bold" style={{
+                      color: product.keepa_rating_evolution.avg_rating_change >= 0.1 ? "#10b981" : product.keepa_rating_evolution.avg_rating_change <= -0.15 ? "#ef4444" : "#6366f1"
+                    }}>
+                      {product.keepa_rating_evolution.verdict}
+                    </p>
+                    <p className="text-[9px] mt-1" style={{ color: "var(--text-muted)" }}>
+                      Cambio: {product.keepa_rating_evolution.avg_rating_change > 0 ? "+" : ""}{product.keepa_rating_evolution.avg_rating_change} estrellas
+                    </p>
+                  </div>
+                )}
+
+                {/* Seasonality */}
+                {product.keepa_seasonality && (
+                  <div className="p-2.5 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
+                    <p className="text-[9px] font-bold uppercase mb-1" style={{ color: "var(--text-muted)" }}>Estacionalidad</p>
+                    <p className="text-[10px] font-bold" style={{
+                      color: product.keepa_seasonality.is_seasonal ? "#f59e0b" : "#10b981"
+                    }}>
+                      {product.keepa_seasonality.verdict}
+                    </p>
+                    <p className="text-[9px] mt-1" style={{ color: "var(--text-muted)" }}>
+                      Volatilidad BSR: {product.keepa_seasonality.bsr_volatility_ratio}x
+                    </p>
+                  </div>
+                )}
+              </div>
+              {product.keepa_last_updated && (
+                <p className="text-[8px] mt-2 text-right" style={{ color: "var(--text-muted)" }}>
+                  Actualizado: {new Date(product.keepa_last_updated).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Seller Competition (Offers) */}
           {product.offers && product.offers.length > 0 && (
             <div className="card mb-4">
@@ -838,6 +953,11 @@ export default function ProductTrackerPage() {
                           {p.has_aplus && (
                             <span className="text-[8px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-0.5" style={{ background: "rgba(168,85,247,0.12)", color: "#a855f7" }}>
                               A+
+                            </span>
+                          )}
+                          {p.keepa_data_confidence != null && p.keepa_data_confidence > 0 && (
+                            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-0.5" style={{ background: "rgba(139,92,246,0.12)", color: "#8b5cf6" }}>
+                              KEEPA {p.keepa_data_confidence}%
                             </span>
                           )}
                         </div>
