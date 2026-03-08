@@ -81,6 +81,8 @@ class ProductTracker:
                         rating = detail["rating"]
                     if reviews_count is None and detail.get("total_reviews"):
                         reviews_count = detail["total_reviews"]
+                    if not image_url and detail.get("images"):
+                        image_url = detail["images"][0]
             except Exception as e:
                 logger.warning("Could not fetch detail for %s: %s", asin, e)
 
