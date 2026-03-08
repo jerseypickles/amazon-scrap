@@ -286,9 +286,18 @@ export interface AICompareResponse {
 }
 
 // Watchlist types
-export interface ScoreHistoryPoint {
-  score: number;
+export interface MetricsHistoryPoint {
   date: string;
+  score: number;
+  avg_price?: number | null;
+  median_reviews?: number | null;
+  brand_count?: number | null;
+  top3_brand_share?: number | null;
+  estimated_margin?: number | null;
+  total_products?: number | null;
+  revenue_estimate?: number | null;
+  keepa_trend?: string | null;
+  keepa_sellers_change?: number | null;
 }
 
 export interface WatchlistItem {
@@ -298,7 +307,18 @@ export interface WatchlistItem {
   last_score: number | null;
   previous_score: number | null;
   score_trend: string | null;
-  score_history: ScoreHistoryPoint[];
+  score_history: MetricsHistoryPoint[];
+  action_signal: string | null;
+  last_metrics: {
+    avg_price?: number | null;
+    median_reviews?: number | null;
+    brand_count?: number | null;
+    top3_brand_share?: number | null;
+    estimated_margin?: number | null;
+    total_products?: number | null;
+    revenue_estimate?: number | null;
+  } | null;
+  alerts: string[];
   check_interval_hours: number;
   is_active: boolean;
   is_paused: boolean;

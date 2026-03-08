@@ -13,9 +13,18 @@ class WatchlistAddRequest(BaseModel):
     notes: str | None = None
 
 
-class ScoreHistoryPoint(BaseModel):
-    score: float
+class MetricsHistoryPoint(BaseModel):
     date: str
+    score: float
+    avg_price: float | None = None
+    median_reviews: float | None = None
+    brand_count: int | None = None
+    top3_brand_share: float | None = None
+    estimated_margin: float | None = None
+    total_products: int | None = None
+    revenue_estimate: float | None = None
+    keepa_trend: str | None = None
+    keepa_sellers_change: float | None = None
 
 
 class WatchlistItemResponse(BaseModel):
@@ -25,7 +34,10 @@ class WatchlistItemResponse(BaseModel):
     last_score: float | None = None
     previous_score: float | None = None
     score_trend: str | None = None
-    score_history: list[ScoreHistoryPoint] = []
+    score_history: list[MetricsHistoryPoint] = []
+    action_signal: str | None = None
+    last_metrics: dict | None = None
+    alerts: list[str] = []
     check_interval_hours: int = 24
     is_active: bool = True
     is_paused: bool = False
