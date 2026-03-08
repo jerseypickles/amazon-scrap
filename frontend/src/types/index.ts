@@ -71,6 +71,20 @@ export interface PriceRange {
   count: number;
 }
 
+export interface LaunchInvestment {
+  review_target: number;
+  best_range_median_reviews: number;
+  vine_cost: number;
+  vine_reviews: number;
+  ppc_total_estimate: number;
+  inventory_cost: number;
+  total_investment: number;
+  breakeven_months: number;
+  months_to_review_target: number;
+  estimated_cpc: number;
+  conversion_rate_new: number;
+}
+
 export interface NicheAnalysis {
   id: number;
   keyword: string;
@@ -112,6 +126,7 @@ export interface NicheAnalysis {
   price_distribution: PriceRange[];
   rating_distribution: { range: string; count: number }[];
   review_distribution: { range: string; count: number }[];
+  launch_investment: LaunchInvestment | null;
   created_at: string | null;
   is_cached?: boolean;
 }

@@ -181,22 +181,29 @@ class NicheAnalyzer:
         demand_score, demand_bd = self._calc_demand_score(raw_products, reviews, prices, keepa_data)
         competition_score, competition_bd = self._calc_competition_score(
             raw_products, reviews, brand_count, top3_share, keepa_data,
+            saturation=saturation, price_opportunity=price_opportunity,
         )
         price_score, price_bd = self._calc_price_score(prices, avg_price, median_price, keepa_data)
         quality_gap_score, quality_bd = self._calc_quality_gap_score(ratings, reviews, keepa_data)
 
+        # Launch investment calculation — realistic cost to enter this niche
+        launch_investment = self._calc_launch_investment(
+            ref_price, estimated_margin, price_opportunity, keepa_data,
+        )
+
         # Entrant viability — can a new small seller make money?
         entrant_viability_score, entrant_viability_bd = self._calc_entrant_viability_score(
             raw_products, ref_price, estimated_margin, revenue_tiers, price_opportunity,
+            launch_investment=launch_investment,
         )
 
-        # Final opportunity score: 30% Demand + 25% Competition + 25% Price + 10% Quality + 10% Entrant
+        # Final opportunity score: 25% Demand + 25% Competition + 20% Price + 10% Quality + 20% Entrant
         opportunity_score = round(
-            (demand_score * 0.30)
+            (demand_score * 0.25)
             + (competition_score * 0.25)
-            + (price_score * 0.25)
+            + (price_score * 0.20)
             + (quality_gap_score * 0.10)
-            + (entrant_viability_score * 0.10),
+            + (entrant_viability_score * 0.20),
             1,
         )
 
@@ -254,6 +261,8 @@ class NicheAnalyzer:
             keepa_sales_estimate=keepa_data.get("sales_estimate") if keepa_data else None,
             keepa_data_confidence=keepa_data.get("data_confidence") if keepa_data else None,
             keepa_products_analyzed=keepa_data.get("keepa_products_analyzed") if keepa_data else None,
+            # Launch investment
+            launch_investment=launch_investment,
         )
 
         now = datetime.now(timezone.utc)
@@ -524,10 +533,13 @@ class NicheAnalyzer:
         self, products: list[dict], reviews: list[int],
         brand_count: int | None, top3_share: float | None,
         keepa: dict | None = None,
+        saturation: dict | None = None,
+        price_opportunity: dict | None = None,
     ) -> tuple[float, list[dict]]:
         """Competition = how hard is it to enter this niche?
         HIGH score = LOW competition (good for us).
         When Keepa data is available, seller dynamics replace review gap.
+        Includes review barrier and saturation penalty for realism.
         """
         breakdown = []
         if not products:
@@ -537,16 +549,13 @@ class NicheAnalyzer:
         score = 0.0
 
         has_keepa_sellers = keepa and keepa.get("seller_dynamics")
-        # With Keepa we replace the review gap signal with seller dynamics
+        # Weights: added review barrier (20%), rebalanced others
         if has_keepa_sellers:
-            w_leaders, w_conc, w_div, w_badges, w_sellers = 30, 20, 15, 15, 20
+            w_leaders, w_barrier, w_conc, w_div, w_badges, w_sellers = 20, 20, 15, 10, 10, 25
         else:
-            w_leaders, w_conc, w_div, w_badges, w_gap = 35, 25, 15, 15, 10
+            w_leaders, w_barrier, w_conc, w_div, w_badges, w_gap = 25, 20, 15, 10, 10, 20
 
         # --- Signal 1: Small seller viability ---
-        # How many products with <500 reviews are actively selling?
-        # This matters more than how big the leaders are.
-        sorted_reviews = sorted(reviews, reverse=True) if reviews else []
         small_sellers_active = sum(
             1 for p in products
             if (p.get("reviews_count") or 0) < 500 and p.get("monthly_bought")
@@ -569,7 +578,41 @@ class NicheAnalyzer:
         score += signal_val
         breakdown.append({"signal": "Viabilidad del Pequeño", "value": f"{small_sellers_active} vendedores <500 rev vendiendo ({small_ratio_pct:.0f}%)", "score": viability_score, "weight": w_leaders, "weighted": signal_val})
 
-        # --- Signal 2: Brand concentration ---
+        # --- Signal 2: Review barrier (NEW) ---
+        # How many reviews do you need to be competitive? Use best price range median.
+        best_range_name = (price_opportunity or {}).get("best_range")
+        barrier_median = None
+        if best_range_name and price_opportunity:
+            for r in price_opportunity.get("ranges", []):
+                if r["range"] == best_range_name:
+                    barrier_median = r.get("avg_reviews", 0)
+                    break
+        if barrier_median is None and reviews:
+            barrier_median = statistics.median(reviews)
+
+        if barrier_median is not None:
+            if barrier_median >= 500:
+                barrier_score = 15
+            elif barrier_median >= 300:
+                barrier_score = 30
+            elif barrier_median >= 150:
+                barrier_score = 45
+            elif barrier_median >= 50:
+                barrier_score = 65
+            elif barrier_median >= 20:
+                barrier_score = 80
+            else:
+                barrier_score = 95
+            signal_val = round(barrier_score * w_barrier / 100, 1)
+            score += signal_val
+            range_label = f" (rango {best_range_name})" if best_range_name and best_range_name != "Sin datos" else ""
+            breakdown.append({"signal": "Barrera de Reviews", "value": f"~{barrier_median:,.0f} reviews mediana{range_label}", "score": barrier_score, "weight": w_barrier, "weighted": signal_val})
+        else:
+            signal_val = round(50 * w_barrier / 100, 1)
+            score += signal_val
+            breakdown.append({"signal": "Barrera de Reviews", "value": "Sin datos", "score": 50, "weight": w_barrier, "weighted": signal_val})
+
+        # --- Signal 3: Brand concentration ---
         if top3_share is not None:
             if top3_share < 20:
                 conc_score = 90
@@ -591,7 +634,7 @@ class NicheAnalyzer:
             score += signal_val
             breakdown.append({"signal": "Concentración Top-3", "value": "Sin datos", "score": 50, "weight": w_conc, "weighted": signal_val})
 
-        # --- Signal 3: Brand diversity ---
+        # --- Signal 4: Brand diversity ---
         if brand_count is not None:
             if brand_count >= 20:
                 div_score = 85
@@ -613,13 +656,16 @@ class NicheAnalyzer:
             score += signal_val
             breakdown.append({"signal": "Diversidad de Marcas", "value": "Sin datos", "score": 50, "weight": w_div, "weighted": signal_val})
 
-        # --- Signal 4: Amazon dominance indicators ---
+        # --- Signal 5: Amazon dominance indicators ---
         badge_count = sum(
             1 for p in products
             if p.get("is_best_seller") or p.get("is_amazon_choice")
         )
         badge_ratio = badge_count / n if n else 0
-        if badge_ratio < 0.05:
+        # Anomaly detection: 0 badges in a large niche is likely scraper error
+        if badge_ratio < 0.05 and n > 20 and badge_count == 0:
+            badge_score = 50  # neutral — unreliable data
+        elif badge_ratio < 0.05:
             badge_score = 80
         elif badge_ratio < 0.10:
             badge_score = 65
@@ -631,31 +677,30 @@ class NicheAnalyzer:
             badge_score = 15
         signal_val = round(badge_score * w_badges / 100, 1)
         score += signal_val
-        breakdown.append({"signal": "Badges Amazon", "value": f"{badge_count} badges ({badge_ratio:.0%})", "score": badge_score, "weight": w_badges, "weighted": signal_val})
+        anomaly_note = " (dato no confiable)" if badge_count == 0 and n > 20 else ""
+        breakdown.append({"signal": "Badges Amazon", "value": f"{badge_count} badges ({badge_ratio:.0%}){anomaly_note}", "score": badge_score, "weight": w_badges, "weighted": signal_val})
 
-        # --- Signal 5: Seller dynamics (Keepa) OR Review gap (fallback) ---
+        # --- Signal 6: Seller dynamics (Keepa) OR Review gap (fallback) ---
+        sorted_reviews = sorted(reviews, reverse=True) if reviews else []
         if has_keepa_sellers:
             sd = keepa["seller_dynamics"]
             change = sd["avg_seller_change_pct"]
-            inc_pct = sd["sellers_increasing_pct"]
-            # More sellers entering = harder competition (lower score)
             if change >= 30:
-                seller_score = 15  # rapid influx
+                seller_score = 15
             elif change >= 15:
                 seller_score = 30
             elif change >= 5:
                 seller_score = 50
             elif change >= -5:
-                seller_score = 65  # stable
+                seller_score = 65
             elif change >= -15:
-                seller_score = 75  # sellers leaving
+                seller_score = 75
             else:
-                seller_score = 85  # exodus
+                seller_score = 85
             signal_val = round(seller_score * w_sellers / 100, 1)
             score += signal_val
             breakdown.append({"signal": "Dinámica Sellers (Keepa)", "value": f"{change:+.1f}% sellers ({sd['avg_current_sellers']:.0f} prom)", "score": seller_score, "weight": w_sellers, "weighted": signal_val})
         else:
-            # Fallback: review gap
             if len(sorted_reviews) >= 5:
                 top_median = statistics.median(sorted_reviews[:5])
                 bottom_median = statistics.median(sorted_reviews[-5:])
@@ -682,6 +727,19 @@ class NicheAnalyzer:
                 signal_val = round(50 * w_gap / 100, 1)
                 score += signal_val
                 breakdown.append({"signal": "Brecha Reviews", "value": "Pocos productos", "score": 50, "weight": w_gap, "weighted": signal_val})
+
+        # --- Saturation penalty: mature markets get penalized ---
+        if saturation:
+            maturity = saturation.get("dominant_pct", 0) + saturation.get("established_pct", 0)
+            if maturity >= 80:
+                score *= 0.75
+                breakdown.append({"signal": "Penalización Saturación", "value": f"{maturity:.0f}% dominantes+establecidos", "score": -25, "weight": 0, "weighted": round(-score * 0.25 / 0.75, 1)})
+            elif maturity >= 65:
+                score *= 0.85
+                breakdown.append({"signal": "Penalización Saturación", "value": f"{maturity:.0f}% dominantes+establecidos", "score": -15, "weight": 0, "weighted": round(-score * 0.15 / 0.85, 1)})
+            elif maturity >= 50:
+                score *= 0.92
+                breakdown.append({"signal": "Penalización Saturación", "value": f"{maturity:.0f}% dominantes+establecidos", "score": -8, "weight": 0, "weighted": round(-score * 0.08 / 0.92, 1)})
 
         return round(min(max(score, 0), 100), 1), breakdown
 
@@ -950,56 +1008,151 @@ class NicheAnalyzer:
 
         return round(min(max(score, 0), 100), 1), breakdown
 
+    def _calc_launch_investment(
+        self, ref_price: float | None, estimated_margin: float | None,
+        price_opportunity: dict | None, keepa: dict | None,
+    ) -> dict | None:
+        """Calculate realistic launch investment for a new seller.
+
+        Returns review target, Vine cost, PPC estimate, inventory cost,
+        total investment, monthly burn rate, and breakeven months.
+        """
+        if not ref_price or ref_price <= 0:
+            return None
+
+        # Best range median reviews (how many reviews to be competitive)
+        best_range_name = (price_opportunity or {}).get("best_range")
+        best_range_median = None
+        if best_range_name and price_opportunity:
+            for r in price_opportunity.get("ranges", []):
+                if r["range"] == best_range_name:
+                    best_range_median = r.get("avg_reviews", 0)
+                    break
+        if best_range_median is None:
+            best_range_median = 200  # conservative default
+
+        # Review target: ~30% of median, clamped between 30-150
+        review_target = max(30, round(best_range_median * 0.3))
+        review_target = min(review_target, 150)
+
+        # Vine: 30 units given away
+        vine_units = 30
+        unit_cost = ref_price * 0.25 + 1.50  # sourcing + inbound
+        vine_cost = round(vine_units * unit_cost)
+        vine_reviews = 25
+
+        # Organic reviews needed after Vine
+        organic_reviews_needed = max(0, review_target - vine_reviews)
+        sales_for_organic = organic_reviews_needed / 0.015 if organic_reviews_needed > 0 else 0
+
+        # PPC cost based on niche competitiveness
+        if best_range_median >= 500:
+            estimated_cpc = 2.00
+            conversion_new = 0.04
+        elif best_range_median >= 200:
+            estimated_cpc = 1.50
+            conversion_new = 0.06
+        elif best_range_median >= 50:
+            estimated_cpc = 1.00
+            conversion_new = 0.08
+        else:
+            estimated_cpc = 0.60
+            conversion_new = 0.10
+
+        ppc_cost_per_sale = estimated_cpc / conversion_new if conversion_new > 0 else 0
+        ppc_total = round(sales_for_organic * ppc_cost_per_sale)
+
+        # Initial inventory (200 units typical first order)
+        initial_units = 200
+        inventory_cost = round(initial_units * unit_cost)
+
+        # Total launch investment
+        total_investment = vine_cost + ppc_total + inventory_cost
+
+        # Breakeven estimation
+        margin_pct = estimated_margin or 30
+        monthly_profit_per_unit = ref_price * (margin_pct / 100)
+        # Conservative: 2-5 sales/day for a new seller reaching review target
+        daily_sales_at_target = max(2, min(sales_for_organic / 90, 8)) if sales_for_organic > 0 else 3
+        monthly_revenue_at_target = daily_sales_at_target * 30 * ref_price
+        monthly_profit_at_target = monthly_revenue_at_target * (margin_pct / 100)
+
+        if monthly_profit_at_target > 0:
+            breakeven_months = max(3, round(total_investment / monthly_profit_at_target))
+        else:
+            breakeven_months = 12
+        breakeven_months = min(breakeven_months, 12)
+
+        # Time to reach review target
+        months_to_reviews = max(3, round(review_target / 10))  # ~10 reviews/month with Vine+organic
+        months_to_reviews = min(months_to_reviews, 12)
+
+        return {
+            "review_target": review_target,
+            "best_range_median_reviews": round(best_range_median),
+            "vine_cost": vine_cost,
+            "vine_reviews": vine_reviews,
+            "ppc_total_estimate": ppc_total,
+            "inventory_cost": inventory_cost,
+            "total_investment": total_investment,
+            "breakeven_months": breakeven_months,
+            "months_to_review_target": months_to_reviews,
+            "estimated_cpc": estimated_cpc,
+            "conversion_rate_new": conversion_new,
+        }
+
     def _calc_entrant_viability_score(
         self, products: list[dict], price: float | None,
         estimated_margin: float | None,
         revenue_tiers: dict,
         price_opportunity: dict | None,
+        launch_investment: dict | None = None,
     ) -> tuple[float, list[dict]]:
         """Entrant Viability = can a NEW small seller make money here?
         HIGH score = realistic path to profit for a newcomer.
+        Uses launch_investment data for realism.
         """
         breakdown = []
         if not products:
             return 40.0, []
 
         score = 0.0
-        w_profit, w_survivors, w_entry = 40, 30, 30
+        w_profit, w_survivors, w_entry, w_investment = 30, 25, 20, 25
 
         # --- Signal 1: Estimated monthly profit for new entrant ---
+        # Use 50% of entry revenue (new seller won't reach p25 immediately)
         entry_rev = revenue_tiers.get("revenue_entry")
         margin_pct = estimated_margin or 0
         if entry_rev and margin_pct > 0:
-            monthly_profit = entry_rev * (margin_pct / 100)
-            if monthly_profit >= 3000:
+            realistic_rev = entry_rev * 0.5  # new seller discount
+            monthly_profit = realistic_rev * (margin_pct / 100)
+            if monthly_profit >= 2000:
                 profit_score = 90
-            elif monthly_profit >= 1500:
+            elif monthly_profit >= 1000:
                 profit_score = 75
-            elif monthly_profit >= 800:
+            elif monthly_profit >= 500:
                 profit_score = 60
-            elif monthly_profit >= 400:
+            elif monthly_profit >= 250:
                 profit_score = 45
-            elif monthly_profit >= 200:
+            elif monthly_profit >= 100:
                 profit_score = 30
             else:
                 profit_score = 15
             signal_val = round(profit_score * w_profit / 100, 1)
             score += signal_val
-            breakdown.append({"signal": "Ganancia Estimada Entrante", "value": f"~${monthly_profit:,.0f}/mes ({margin_pct:.0f}% margen)", "score": profit_score, "weight": w_profit, "weighted": signal_val})
+            breakdown.append({"signal": "Ganancia Estimada Entrante", "value": f"~${monthly_profit:,.0f}/mes (realista nuevo vendedor)", "score": profit_score, "weight": w_profit, "weighted": signal_val})
         else:
             signal_val = round(30 * w_profit / 100, 1)
             score += signal_val
             breakdown.append({"signal": "Ganancia Estimada Entrante", "value": "Sin datos suficientes", "score": 30, "weight": w_profit, "weighted": signal_val})
 
         # --- Signal 2: Small seller survivors ---
-        # Products with <500 reviews that show monthly_bought = small sellers making sales
         n = len(products)
         small_with_sales = sum(
             1 for p in products
             if (p.get("reviews_count") or 0) < 500 and p.get("monthly_bought")
         )
-        small_ratio = small_with_sales / n if n else 0
-        small_pct = small_ratio * 100
+        small_pct = (small_with_sales / n * 100) if n else 0
 
         if small_pct >= 30:
             surv_score = 90
@@ -1015,7 +1168,7 @@ class NicheAnalyzer:
             surv_score = 15
         signal_val = round(surv_score * w_survivors / 100, 1)
         score += signal_val
-        breakdown.append({"signal": "Vendedores Pequeños Activos", "value": f"{small_with_sales} de {n} productos ({small_pct:.0f}% <500 rev vendiendo)", "score": surv_score, "weight": w_survivors, "weighted": signal_val})
+        breakdown.append({"signal": "Vendedores Pequeños Activos", "value": f"{small_with_sales} de {n} ({small_pct:.0f}% <500 rev vendiendo)", "score": surv_score, "weight": w_survivors, "weighted": signal_val})
 
         # --- Signal 3: Best entry ease across price ranges ---
         ranges = (price_opportunity or {}).get("ranges", [])
@@ -1037,6 +1190,33 @@ class NicheAnalyzer:
         signal_val = round(ease_score * w_entry / 100, 1)
         score += signal_val
         breakdown.append({"signal": "Mejor Facilidad de Entrada", "value": best_ease, "score": ease_score, "weight": w_entry, "weighted": signal_val})
+
+        # --- Signal 4: Investment feasibility (NEW) ---
+        if launch_investment:
+            total_inv = launch_investment["total_investment"]
+            breakeven = launch_investment["breakeven_months"]
+            review_target = launch_investment["review_target"]
+
+            # Score based on breakeven months and investment size
+            if breakeven <= 3 and total_inv < 5000:
+                inv_score = 90
+            elif breakeven <= 4 and total_inv < 8000:
+                inv_score = 75
+            elif breakeven <= 6 and total_inv < 12000:
+                inv_score = 60
+            elif breakeven <= 8 and total_inv < 20000:
+                inv_score = 40
+            elif breakeven <= 10:
+                inv_score = 25
+            else:
+                inv_score = 10
+            signal_val = round(inv_score * w_investment / 100, 1)
+            score += signal_val
+            breakdown.append({"signal": "Inversión para ser Viable", "value": f"${total_inv:,} inversión, ~{breakeven} meses breakeven, {review_target} reviews necesarias", "score": inv_score, "weight": w_investment, "weighted": signal_val})
+        else:
+            signal_val = round(40 * w_investment / 100, 1)
+            score += signal_val
+            breakdown.append({"signal": "Inversión para ser Viable", "value": "Sin datos suficientes", "score": 40, "weight": w_investment, "weighted": signal_val})
 
         return round(min(max(score, 0), 100), 1), breakdown
 
@@ -1433,6 +1613,7 @@ class NicheAnalyzer:
             keepa_sales_estimate=a.get("keepa_sales_estimate"),
             keepa_data_confidence=a.get("keepa_data_confidence"),
             keepa_products_analyzed=a.get("keepa_products_analyzed"),
+            launch_investment=a.get("launch_investment"),
             created_at=a.get("created_at"),
         )
 

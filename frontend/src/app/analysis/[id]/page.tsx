@@ -10,7 +10,7 @@ import {
   Layers, Crosshair, Zap, MessageCircle, Send, Megaphone,
   ChevronDown, ChevronUp, BarChart2,
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+// Charts removed — data shown in Price Opportunity table + Saturation bar
 import { getAnalysis, getAIAnalysis, refreshAIAnalysis, getAnalysisProducts, addToWatchlist, checkWatchlist, rescrapeAnalysis, aiChat, analyzeNiche, trackProduct, quickCheck } from "@/lib/api";
 import type { NicheAnalysis, AIInsight, Product, ScoreBreakdown, QuickCheckResult } from "@/types";
 
@@ -61,8 +61,6 @@ function decisionColor(d?: string) {
   if (d === "caution") return "#f59e0b";
   return "#ef4444";
 }
-
-const tooltipStyle = { background: "#111420", border: "1px solid #1e2336", borderRadius: "10px", fontSize: "12px" };
 
 /* ─── ScoreRing ─── */
 function ScoreRing({ score, size = 120, strokeWidth = 8, label }: { score: number | null; size?: number; strokeWidth?: number; label?: string }) {
@@ -430,11 +428,16 @@ export default function AnalysisDetailPage() {
               {/* Key stats */}
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
                 <span><span style={{ color: "var(--text-muted)" }}>Productos:</span> <strong>{analysis.total_products}</strong></span>
-                <span><span style={{ color: "var(--text-muted)" }}>Precio:</span> <strong style={{ color: "#f59e0b" }}>{analysis.avg_price ? `$${analysis.avg_price.toFixed(2)}` : "--"}</strong></span>
+                <span><span style={{ color: "var(--text-muted)" }}>Precio Mediana:</span> <strong style={{ color: "#f59e0b" }}>{analysis.median_price ? `$${analysis.median_price.toFixed(2)}` : "--"}</strong></span>
                 <span><span style={{ color: "var(--text-muted)" }}>Reviews Med:</span> <strong style={{ color: "#6366f1" }}>{analysis.median_reviews?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? "--"}</strong></span>
-                <span><span style={{ color: "var(--text-muted)" }}>Prime:</span> <strong style={{ color: "#10b981" }}>{analysis.prime_percentage != null ? `${analysis.prime_percentage}%` : "--"}</strong></span>
                 {analysis.estimated_margin != null && (
                   <span><span style={{ color: "var(--text-muted)" }}>Margen:</span> <strong style={{ color: analysis.estimated_margin >= 30 ? "#10b981" : analysis.estimated_margin >= 20 ? "#f59e0b" : "#ef4444" }}>~{analysis.estimated_margin}%</strong></span>
+                )}
+                {analysis.launch_investment && (
+                  <>
+                    <span><span style={{ color: "var(--text-muted)" }}>Inversi&oacute;n:</span> <strong style={{ color: "var(--accent)" }}>${analysis.launch_investment.total_investment.toLocaleString()}</strong></span>
+                    <span><span style={{ color: "var(--text-muted)" }}>Breakeven:</span> <strong>~{analysis.launch_investment.breakeven_months}m</strong></span>
+                  </>
                 )}
               </div>
             </div>
@@ -499,6 +502,52 @@ export default function AnalysisDetailPage() {
       {/* ── Tab: Decisión ── */}
       {activeTab === "decision" && (
         <div className="space-y-4">
+          {/* Launch Investment (calculated) */}
+          {analysis.launch_investment && (
+            <div className="card" style={{ border: "1px solid rgba(249,115,22,0.2)" }}>
+              <div className="flex items-center gap-2 mb-3">
+                <DollarSign size={15} color="var(--accent)" />
+                <h4 className="text-sm font-bold">Inversi&oacute;n para Lanzar</h4>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(249,115,22,0.1)", color: "var(--accent)" }}>Calculado</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                <div className="p-2 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
+                  <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Vine (30 uds)</p>
+                  <p className="text-sm font-bold" style={{ color: "#8b5cf6" }}>${analysis.launch_investment.vine_cost.toLocaleString()}</p>
+                  <p className="text-[8px]" style={{ color: "var(--text-muted)" }}>~{analysis.launch_investment.vine_reviews} reviews</p>
+                </div>
+                <div className="p-2 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
+                  <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>PPC Estimado</p>
+                  <p className="text-sm font-bold" style={{ color: "#f59e0b" }}>${analysis.launch_investment.ppc_total_estimate.toLocaleString()}</p>
+                  <p className="text-[8px]" style={{ color: "var(--text-muted)" }}>CPC ~${analysis.launch_investment.estimated_cpc}, conv {(analysis.launch_investment.conversion_rate_new * 100).toFixed(0)}%</p>
+                </div>
+                <div className="p-2 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
+                  <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Inventario (200 uds)</p>
+                  <p className="text-sm font-bold" style={{ color: "#6366f1" }}>${analysis.launch_investment.inventory_cost.toLocaleString()}</p>
+                </div>
+                <div className="p-2 rounded-lg" style={{ background: "rgba(249,115,22,0.05)", border: "1px solid rgba(249,115,22,0.15)" }}>
+                  <p className="text-[9px] font-bold uppercase" style={{ color: "var(--accent)" }}>TOTAL</p>
+                  <p className="text-lg font-black" style={{ color: "var(--accent)" }}>${analysis.launch_investment.total_investment.toLocaleString()}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-2 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
+                  <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Reviews Necesarias</p>
+                  <p className="text-sm font-bold">~{analysis.launch_investment.review_target} reviews</p>
+                  <p className="text-[8px]" style={{ color: "var(--text-muted)" }}>
+                    ~{analysis.launch_investment.months_to_review_target} meses (Vine + org&aacute;nicas) &middot; Mediana del rango: {analysis.launch_investment.best_range_median_reviews}
+                  </p>
+                </div>
+                <div className="p-2 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
+                  <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Breakeven Estimado</p>
+                  <p className="text-sm font-bold" style={{ color: analysis.launch_investment.breakeven_months <= 6 ? "#10b981" : analysis.launch_investment.breakeven_months <= 9 ? "#f59e0b" : "#ef4444" }}>
+                    ~{analysis.launch_investment.breakeven_months} meses
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Go/No-Go Checklist */}
           {aiInsight?.go_no_go && (
             <div className="card">
@@ -864,26 +913,7 @@ export default function AnalysisDetailPage() {
             </div>
           )}
 
-          {/* Charts */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              { title: "Precios", data: analysis.price_distribution, color: "#6366f1" },
-              { title: "Reviews", data: analysis.review_distribution, color: "#10b981" },
-              { title: "Ratings", data: analysis.rating_distribution, color: "#f59e0b" },
-            ].map((chart) => (
-              <div key={chart.title} className="card">
-                <h3 className="text-sm font-bold mb-3">{chart.title}</h3>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={chart.data}>
-                    <XAxis dataKey="range" tick={{ fill: "#5c6380", fontSize: 10 }} />
-                    <YAxis tick={{ fill: "#5c6380", fontSize: 10 }} />
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Bar dataKey="count" fill={chart.color} radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ))}
-          </div>
+          {/* Charts removed — data already available in Price Opportunity table and Saturation bar */}
         </div>
       )}
 

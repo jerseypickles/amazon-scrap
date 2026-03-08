@@ -56,5 +56,7 @@ def new_analysis_doc(id: int, **fields) -> dict:
         "keepa_sales_estimate": fields.get("keepa_sales_estimate"),
         "keepa_data_confidence": fields.get("keepa_data_confidence"),
         "keepa_products_analyzed": fields.get("keepa_products_analyzed"),
+        # Launch investment (calculated)
+        "launch_investment": fields.get("launch_investment"),
         "created_at": datetime.now(timezone.utc),
     }

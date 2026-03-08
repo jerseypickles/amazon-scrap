@@ -129,6 +129,21 @@ PRESUPUESTO DISPONIBLE: ${b:,}
                 if isinstance(p, dict):
                     ctx += f"- {p.get('range', '?')}: {p.get('count', 0)} productos\n"
 
+        # Launch investment (calculated by backend)
+        launch_inv = analysis_data.get('launch_investment')
+        if launch_inv and isinstance(launch_inv, dict):
+            ctx += f"\nINVERSIÓN PARA SER VIABLE (calculado por el sistema):\n"
+            ctx += f"- Reviews necesarias para competir: ~{launch_inv.get('review_target', 'N/A')}\n"
+            ctx += f"- Mediana reviews del mejor rango: {launch_inv.get('best_range_median_reviews', 'N/A')}\n"
+            ctx += f"- Costo Vine (30 uds regaladas, ~25 reviews): ${launch_inv.get('vine_cost', 'N/A')}\n"
+            ctx += f"- PPC estimado para alcanzar reviews: ${launch_inv.get('ppc_total_estimate', 'N/A')}\n"
+            ctx += f"- Inventario inicial (200 uds): ${launch_inv.get('inventory_cost', 'N/A')}\n"
+            ctx += f"- TOTAL inversión para lanzar: ${launch_inv.get('total_investment', 'N/A')}\n"
+            ctx += f"- Breakeven estimado: ~{launch_inv.get('breakeven_months', 'N/A')} meses\n"
+            ctx += f"- Meses para alcanzar review target: ~{launch_inv.get('months_to_review_target', 'N/A')}\n"
+            ctx += f"- CPC estimado: ${launch_inv.get('estimated_cpc', 'N/A')}\n"
+            ctx += f"- Conversión estimada (vendedor nuevo): {(launch_inv.get('conversion_rate_new', 0) * 100):.0f}%\n"
+
         # Data quality warnings (condensed)
         warnings = []
         prime_pct = analysis_data.get('prime_percentage')
@@ -334,20 +349,15 @@ PRESUPUESTO DISPONIBLE: ${b:,}
 {profile_prompt}
 
 REGLAS CLAVE:
-- FILOSOFÍA CENTRAL: NO estás evaluando si el vendedor puede ser #1 o dominar el nicho. Estás evaluando si un vendedor PEQUEÑO puede HACER DINERO en este nicho — aunque sea en la posición #40 o #50.
-- Que existan gigantes como Bertolli o Charmin NO es razón para un NO-GO. Lo que importa es: ¿hay vendedores pequeños (<500 reviews) que están vendiendo activamente? Si sí, hay espacio.
-- Usa los 3 niveles de revenue (Entrada/Medio/Top) para evaluar. El "Revenue Entrada" es lo que realistamente ganaría un nuevo vendedor. Evalúa si ESE número, con el margen estimado, justifica la inversión.
-- Usa el "Score Viabilidad Entrante" y su desglose — este score mide directamente si vendedores pequeños sobreviven en el nicho.
-- Sé honesto y directo. Si un nicho es NO-GO, dilo con datos concretos. No busques ángulos forzados.
-- Solo recomienda GO si los datos lo justifican. CAUTELA o NO-GO honesto es más valioso que un GO forzado.
-- NO inventes números exactos que no puedes saber (CPC exacto, precio FOB exacto, ROI exacto). Usa rangos estimados.
-- Los datos del scraper pueden tener errores — si un dato parece imposible (ej: 0% Prime en nicho grande), menciónalo.
-- Calcula VMV (Volumen Mínimo Viable): unidades/mes para breakeven. Compara con el "Revenue Entrada" — si el VMV es menor que el revenue de entrada, es alcanzable.
-- Si la keyword es genérica/amplia, sugiere sub-nichos más específicos con keywords reales de Amazon.
-- Busca en la ventana de oportunidad de precio los rangos con "pequeños" (productos <300 reviews) — ahí es donde puedes entrar.
-- Máximo 3 ideas de producto, 3 riesgos, 5 sub-nichos. Sé conciso.
-- Para ideas de producto: usa la ventana de oportunidad de precio (rangos con pequeños vendedores activos) y el desglose de calidad. Basa las ideas en gaps reales de los datos.
-- Para sub-nichos: sugiere keywords REALES y específicas que un usuario buscaría en Amazon. NO inventes la competencia — solo explica por qué el sub-nicho podría ser más accesible que el nicho principal.
+- FILOSOFÍA: ¿Puede un vendedor PEQUEÑO HACER DINERO? No importa si puede ser #1. Evalúa si alguien en posición #40 puede ser rentable.
+- Que existan gigantes NO es NO-GO. Lo que importa: ¿hay vendedores <500 reviews vendiendo? Si sí, hay espacio.
+- Los datos de INVERSIÓN PARA SER VIABLE ya están calculados por el sistema. NO reinventes esos números. Úsalos para contextualizar y validar, no para inventar cifras diferentes.
+- Revenue Entrada = lo que ganaría un nuevo vendedor (conservador). Evalúa si justifica la inversión calculada.
+- Sé CONCISO. Oraciones cortas. Sin fluff. Los datos hablan. Máximo 3 ideas de producto, 3 riesgos, 5 sub-nichos.
+- Sé honesto. CAUTELA o NO-GO honesto > GO forzado. Si los datos no justifican entrada, dilo claro.
+- NO inventes números exactos (CPC, FOB, ROI). Usa rangos.
+- Si keyword es genérica, sugiere sub-nichos con keywords REALES de Amazon.
+- Ventana de precio: busca rangos con vendedores pequeños activos — ahí es donde se puede entrar.
 
 Analiza estos datos de Amazon US:
 
@@ -362,7 +372,7 @@ Responde SOLO con JSON válido (sin markdown, sin ```):
         try:
             response = self.client.messages.create(
                 model="claude-sonnet-4-20250514",
-                max_tokens=4000,
+                max_tokens=3000,
                 messages=[{"role": "user", "content": prompt}],
             )
 

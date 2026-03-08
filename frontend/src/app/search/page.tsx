@@ -6,15 +6,8 @@ import {
   Search,
   Loader2,
   AlertCircle,
-  TrendingUp,
-  DollarSign,
-  Star,
-  Users,
   ArrowRight,
-  ShieldCheck,
   Repeat,
-  Package,
-  Zap,
   Brain,
   Sparkles,
 } from "lucide-react";
@@ -285,7 +278,7 @@ function SearchPageInner() {
             </div>
           )}
 
-          {/* Hero Score */}
+          {/* Hero Card — Simplified result with key decision data */}
           <div
             className="card-premium rounded-2xl p-6 mb-6"
             style={{
@@ -293,7 +286,8 @@ function SearchPageInner() {
               boxShadow: `var(--shadow-elevated), 0 0 40px ${scoreColor(result.opportunity_score)}10`,
             }}
           >
-            <div className="flex items-center justify-between">
+            {/* Top row: keyword + score */}
+            <div className="flex items-center justify-between mb-4">
               <div>
                 <div className="flex items-center gap-3 mb-1">
                   <h2 className="text-2xl font-bold capitalize">{result.keyword}</h2>
@@ -304,13 +298,20 @@ function SearchPageInner() {
                     <span className="badge badge-info" style={{ fontSize: "9px" }}>Existente</span>
                   )}
                 </div>
+                {/* Quick verdict based on score */}
                 <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                  {result.total_products} productos analizados · {result.brand_count} marcas detectadas
+                  {(result.opportunity_score ?? 0) >= 65
+                    ? "Nicho con buena oportunidad para vendedores nuevos"
+                    : (result.opportunity_score ?? 0) >= 50
+                    ? "Nicho moderado \u2014 viable con diferenciaci\u00f3n"
+                    : (result.opportunity_score ?? 0) >= 35
+                    ? "Nicho competido \u2014 requiere inversi\u00f3n significativa"
+                    : "Nicho dif\u00edcil \u2014 alta barrera de entrada"}
                 </p>
               </div>
               <div className="text-center">
                 <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: "var(--text-muted)" }}>
-                  Score Oportunidad
+                  Score
                 </p>
                 <div
                   className="text-5xl font-black stat-glow"
@@ -318,193 +319,75 @@ function SearchPageInner() {
                 >
                   {result.opportunity_score ?? "--"}
                 </div>
-                <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>de 100</p>
               </div>
             </div>
-          </div>
 
-          {/* Score Breakdown */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            {[
-              { label: "Demanda", score: result.demand_score, icon: TrendingUp, desc: "Tamaño del mercado" },
-              { label: "Competencia", score: result.competition_score, icon: Users, desc: "Menor = más fácil" },
-              { label: "Precio", score: result.price_score, icon: DollarSign, desc: "Potencial de margen" },
-              { label: "Calidad", score: result.quality_gap_score, icon: Star, desc: "Espacio de mejora" },
-            ].map((s) => (
-              <div key={s.label} className="card text-center">
-                <div
-                  className="w-10 h-10 rounded-xl mx-auto mb-3 flex items-center justify-center"
-                  style={{
-                    background: `${scoreColor(s.score)}12`,
-                    boxShadow: `0 0 15px ${scoreColor(s.score)}08`,
-                  }}
-                >
-                  <s.icon size={18} color={scoreColor(s.score)} />
+            {/* Key data row */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+              <div className="metric-tile">
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Productos</p>
+                <p className="text-lg font-bold mt-0.5">{result.total_products}</p>
+              </div>
+              <div className="metric-tile">
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Precio Mediana</p>
+                <p className="text-lg font-bold mt-0.5">{result.median_price ? `$${result.median_price.toFixed(2)}` : "--"}</p>
+              </div>
+              <div className="metric-tile">
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Marcas</p>
+                <p className="text-lg font-bold mt-0.5">{result.brand_count ?? "--"}</p>
+              </div>
+              <div className="metric-tile">
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Dominantes</p>
+                <p className="text-lg font-bold mt-0.5" style={{ color: (result.saturation?.dominant_pct ?? 0) >= 40 ? "var(--danger)" : (result.saturation?.dominant_pct ?? 0) >= 20 ? "var(--warning)" : "var(--success)" }}>
+                  {result.saturation?.dominant_pct?.toFixed(0) ?? "--"}%
+                </p>
+              </div>
+            </div>
+
+            {/* 5 mini scores */}
+            <div className="grid grid-cols-5 gap-2 mb-4">
+              {[
+                { label: "Demanda", score: result.demand_score },
+                { label: "Competencia", score: result.competition_score },
+                { label: "Precio", score: result.price_score },
+                { label: "Calidad", score: result.quality_gap_score },
+                { label: "Viabilidad", score: result.entrant_viability_score },
+              ].map((s) => (
+                <div key={s.label} className="text-center py-2 rounded-lg" style={{ background: "rgba(255,255,255,0.03)" }}>
+                  <p className="text-lg font-black" style={{ color: scoreColor(s.score) }}>{s.score ?? "--"}</p>
+                  <p className="text-[9px] font-semibold uppercase" style={{ color: "var(--text-muted)" }}>{s.label}</p>
                 </div>
-                <p className="text-2xl font-black" style={{ color: scoreColor(s.score) }}>{s.score ?? "--"}</p>
-                <p className="text-xs font-bold mt-1">{s.label}</p>
-                <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>{s.desc}</p>
-                <div className="progress mt-3">
-                  <div className="progress-fill" style={{ width: `${s.score ?? 0}%`, background: scoreColor(s.score) }} />
+              ))}
+            </div>
+
+            {/* Launch Investment metrics */}
+            {result.launch_investment && (
+              <div className="grid grid-cols-3 gap-3 mb-4 p-3 rounded-xl" style={{ background: "rgba(249,115,22,0.05)", border: "1px solid rgba(249,115,22,0.15)" }}>
+                <div className="text-center">
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--accent)" }}>Inversi\u00f3n Estimada</p>
+                  <p className="text-xl font-black mt-0.5">${result.launch_investment.total_investment.toLocaleString()}</p>
+                  <p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Vine + PPC + Inventario</p>
                 </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Key Metrics */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-            {[
-              { label: "Precio Promedio", value: result.avg_price ? `$${result.avg_price.toFixed(2)}` : "--", sub: `$${result.min_price?.toFixed(0) ?? "?"} - $${result.max_price?.toFixed(0) ?? "?"}` },
-              { label: "Precio Mediana", value: result.median_price ? `$${result.median_price.toFixed(2)}` : "--" },
-              { label: "Rating Promedio", value: result.avg_rating ? `${result.avg_rating} / 5` : "--" },
-              { label: "Reviews Prom", value: result.avg_reviews?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? "--" },
-              { label: "Ingreso Est/Mes", value: result.revenue_estimate ? `$${Math.round(result.revenue_estimate).toLocaleString()}` : "--" },
-            ].map((m) => (
-              <div key={m.label} className="metric-tile">
-                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{m.label}</p>
-                <p className="text-lg font-bold mt-1">{m.value}</p>
-                {"sub" in m && m.sub && <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>{m.sub}</p>}
-              </div>
-            ))}
-          </div>
-
-          {/* Brand & Price Distribution */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div className="card">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold">Distribución de Marcas</h3>
-                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  Top 3: {result.top3_brand_share?.toFixed(1)}%
-                </span>
-              </div>
-              <div className="space-y-3">
-                {result.top_brands.slice(0, 8).map((b, i) => (
-                  <div key={b.name} className="flex items-center gap-3">
-                    <span className="text-xs font-bold w-5 text-center" style={{ color: "var(--text-muted)" }}>{i + 1}</span>
-                    <span className="text-sm truncate flex-1 min-w-0">{b.name}</span>
-                    <div className="w-28 progress">
-                      <div className="progress-fill" style={{ width: `${b.market_share}%`, background: "var(--accent)" }} />
-                    </div>
-                    <span className="text-xs font-semibold w-12 text-right" style={{ color: "var(--accent)" }}>
-                      {b.market_share.toFixed(1)}%
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="card">
-              <h3 className="text-sm font-bold mb-4">Distribución de Precios</h3>
-              <div className="space-y-3">
-                {result.price_distribution.map((p) => {
-                  const max = Math.max(...result.price_distribution.map((d) => d.count));
-                  return (
-                    <div key={p.range} className="flex items-center gap-3">
-                      <span className="text-xs w-14" style={{ color: "var(--text-secondary)" }}>{p.range}</span>
-                      <div className="flex-1 progress">
-                        <div className="progress-fill" style={{ width: `${(p.count / max) * 100}%`, background: "var(--info)" }} />
-                      </div>
-                      <span className="text-xs font-semibold w-7 text-right">{p.count}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Rating & Review Distribution */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div className="card">
-              <h3 className="text-sm font-bold mb-4">Distribución de Ratings</h3>
-              <div className="space-y-3">
-                {result.rating_distribution.map((r) => {
-                  const max = Math.max(...result.rating_distribution.map((d) => d.count));
-                  return (
-                    <div key={r.range} className="flex items-center gap-3">
-                      <span className="text-xs w-12" style={{ color: "var(--text-secondary)" }}>{r.range}</span>
-                      <div className="flex-1 progress">
-                        <div className="progress-fill" style={{ width: `${(r.count / max) * 100}%`, background: "var(--warning)" }} />
-                      </div>
-                      <span className="text-xs font-semibold w-7 text-right">{r.count}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="card">
-              <h3 className="text-sm font-bold mb-4">Distribución de Reviews</h3>
-              <div className="space-y-3">
-                {result.review_distribution.map((r) => {
-                  const max = Math.max(...result.review_distribution.map((d) => d.count));
-                  return (
-                    <div key={r.range} className="flex items-center gap-3">
-                      <span className="text-xs w-12" style={{ color: "var(--text-secondary)" }}>{r.range}</span>
-                      <div className="flex-1 progress">
-                        <div className="progress-fill" style={{ width: `${(r.count / max) * 100}%`, background: "var(--success)" }} />
-                      </div>
-                      <span className="text-xs font-semibold w-7 text-right">{r.count}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Summary & CTA */}
-          <div
-            className="card-premium rounded-2xl p-6"
-            style={{
-              background: "linear-gradient(145deg, rgba(12,16,28,0.9), rgba(18,24,42,0.6))",
-              border: `1px solid ${scoreColor(result.opportunity_score)}20`,
-            }}
-          >
-            <div className="flex items-start gap-4">
-              <div
-                className="w-11 h-11 rounded-xl flex-shrink-0 flex items-center justify-center"
-                style={{
-                  background: `${scoreColor(result.opportunity_score)}15`,
-                  boxShadow: `0 0 15px ${scoreColor(result.opportunity_score)}10`,
-                }}
-              >
-                <ShieldCheck size={20} color={scoreColor(result.opportunity_score)} />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-bold mb-2">Resumen del Análisis</h3>
-                <div className="space-y-1.5 text-sm" style={{ color: "var(--text-secondary)" }}>
-                  {(result.opportunity_score ?? 0) >= 65 && (
-                    <p style={{ color: "var(--success)" }}>
-                      Este nicho muestra fuerte oportunidad para marca privada de productos consumibles.
-                    </p>
-                  )}
-                  {(result.opportunity_score ?? 0) >= 40 && (result.opportunity_score ?? 0) < 65 && (
-                    <p style={{ color: "var(--warning)" }}>
-                      Oportunidad moderada. Requiere diferenciación fuerte o precio competitivo.
-                    </p>
-                  )}
-                  {(result.opportunity_score ?? 0) < 40 && (
-                    <p style={{ color: "var(--danger)" }}>
-                      Nicho difícil. Alta competencia o bajo potencial de margen.
-                    </p>
-                  )}
-                  {(result.top3_brand_share ?? 0) <= 40 && (
-                    <p>Mercado fragmentado ({result.top3_brand_share?.toFixed(1)}% top-3) — bueno para marcas nuevas.</p>
-                  )}
-                  {(result.top3_brand_share ?? 0) > 60 && (
-                    <p>Mercado concentrado ({result.top3_brand_share?.toFixed(1)}% top-3) — entrar será más difícil.</p>
-                  )}
-                  {result.avg_price && result.avg_price >= 15 && result.avg_price <= 50 && (
-                    <p>Precio (${result.avg_price.toFixed(2)}) en rango ideal para márgenes de marca privada.</p>
-                  )}
+                <div className="text-center">
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--accent)" }}>Breakeven</p>
+                  <p className="text-xl font-black mt-0.5">~{result.launch_investment.breakeven_months} meses</p>
+                  <p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Tiempo a rentabilidad</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--accent)" }}>Reviews Necesarias</p>
+                  <p className="text-xl font-black mt-0.5">~{result.launch_investment.review_target}</p>
+                  <p className="text-[9px]" style={{ color: "var(--text-muted)" }}>~{result.launch_investment.months_to_review_target} meses (Vine+PPC)</p>
                 </div>
               </div>
-            </div>
-            <div className="mt-5 flex gap-3">
+            )}
+
+            {/* CTA buttons */}
+            <div className="flex gap-3">
               <button onClick={() => router.push(`/analysis/${result.id}`)} className="btn btn-primary">
-                Análisis Completo <ArrowRight size={14} />
+                An\u00e1lisis Completo <ArrowRight size={14} />
               </button>
               <button onClick={() => { setResult(null); setKeyword(""); }} className="btn btn-secondary">
-                Nueva Búsqueda
+                Nueva B\u00fasqueda
               </button>
             </div>
           </div>
