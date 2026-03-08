@@ -615,32 +615,7 @@ export default function AdvisorPage() {
             </div>
           )}
 
-          {/* Cost Estimate */}
-          {insight.cost_estimate && (
-            <div className="card">
-              <div className="flex items-center gap-3 mb-5">
-                <DollarSign size={18} color="#10b981" />
-                <h3 className="text-sm font-bold">Estimaci\u00f3n de Costos</h3>
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(16,185,129,0.1)", color: "#10b981" }}>
-                  Presupuesto ${formatBudget(budget)}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="p-3 rounded-xl" style={{ background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.15)" }}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#10b981" }}>Margen Estimado</p>
-                  <p className="text-xl font-black mt-1" style={{ color: "#10b981" }}>{insight.cost_estimate.margin_range}</p>
-                </div>
-                <div className="p-3 rounded-xl" style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)" }}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#f59e0b" }}>Inversi\u00f3n M\u00ednima</p>
-                  <p className="text-xl font-black mt-1" style={{ color: "#f59e0b" }}>{insight.cost_estimate.min_investment}</p>
-                </div>
-                <div className="p-3 rounded-xl" style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)" }}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--accent)" }}>Breakeven</p>
-                  <p className="text-xl font-black mt-1" style={{ color: "var(--accent)" }}>{insight.cost_estimate.breakeven_months}</p>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Cost Estimate removed — redundant with calculated Launch Investment */}
 
           {/* Entry Strategy */}
           {insight.entry_strategy && (

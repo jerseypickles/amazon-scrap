@@ -579,47 +579,24 @@ export default function AnalysisDetailPage() {
             </div>
           )}
 
-          {/* Cost Estimate + VMV side by side */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {aiInsight?.cost_estimate && (
-              <div className="card">
-                <div className="flex items-center gap-2 mb-3">
-                  <DollarSign size={15} color="#10b981" />
-                  <h4 className="text-sm font-bold">Estimación de Costos</h4>
-                </div>
-                <div className="space-y-2">
-                  {[
-                    { label: "Margen Estimado", value: aiInsight.cost_estimate.margin_range, color: "#10b981" },
-                    { label: "Inversión Mínima", value: aiInsight.cost_estimate.min_investment, color: "#f59e0b" },
-                    { label: "Breakeven", value: aiInsight.cost_estimate.breakeven_months, color: "#6366f1" },
-                  ].map((m) => (
-                    <div key={m.label} className="p-2 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
-                      <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>{m.label}</p>
-                      <p className="text-sm font-bold" style={{ color: m.color }}>{m.value}</p>
-                    </div>
-                  ))}
-                </div>
+          {/* VMV — Cost estimate removed (redundant with calculated Launch Investment card above) */}
+          {aiInsight?.min_viable_volume && (
+            <div className="card">
+              <div className="flex items-center gap-2 mb-3">
+                <BarChart2 size={15} color="#f59e0b" />
+                <h4 className="text-sm font-bold">Volumen Mínimo Viable</h4>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold"
+                  style={{ background: aiInsight.min_viable_volume.achievable ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)", color: aiInsight.min_viable_volume.achievable ? "#10b981" : "#ef4444" }}>
+                  {aiInsight.min_viable_volume.achievable ? "Alcanzable" : "Difícil"}
+                </span>
               </div>
-            )}
-
-            {aiInsight?.min_viable_volume && (
-              <div className="card">
-                <div className="flex items-center gap-2 mb-3">
-                  <BarChart2 size={15} color="#f59e0b" />
-                  <h4 className="text-sm font-bold">Volumen Mínimo Viable</h4>
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold"
-                    style={{ background: aiInsight.min_viable_volume.achievable ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)", color: aiInsight.min_viable_volume.achievable ? "#10b981" : "#ef4444" }}>
-                    {aiInsight.min_viable_volume.achievable ? "Alcanzable" : "Difícil"}
-                  </span>
-                </div>
-                <div className="p-2 rounded-lg mb-3" style={{ background: "var(--bg-elevated)" }}>
-                  <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Breakeven</p>
-                  <p className="text-sm font-bold" style={{ color: "#f59e0b" }}>{aiInsight.min_viable_volume.units_breakeven}</p>
-                </div>
-                <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>{aiInsight.min_viable_volume.reasoning}</p>
+              <div className="p-2 rounded-lg mb-3" style={{ background: "var(--bg-elevated)" }}>
+                <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Breakeven</p>
+                <p className="text-sm font-bold" style={{ color: "#f59e0b" }}>{aiInsight.min_viable_volume.units_breakeven}</p>
               </div>
-            )}
-          </div>
+              <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>{aiInsight.min_viable_volume.reasoning}</p>
+            </div>
+          )}
 
           {/* Entry Strategy */}
           {aiInsight?.entry_strategy && (

@@ -183,12 +183,6 @@ export interface AIEntryStrategy {
   target_rating: string;
 }
 
-export interface AICostEstimate {
-  margin_range: string;
-  min_investment: string;
-  breakeven_months: string;
-}
-
 export interface AIProductIdea {
   name: string;
   description: string;
@@ -266,7 +260,6 @@ export interface AIInsight {
   go_no_go?: AIGoNoGo;
   min_viable_volume?: AIMinViableVolume;
   phase_recommendation?: AIPhaseRecommendation;
-  cost_estimate?: AICostEstimate;
   entry_strategy?: AIEntryStrategy;
   ppc_strategy?: AIPPCStrategy;
   product_ideas?: AIProductIdea[];

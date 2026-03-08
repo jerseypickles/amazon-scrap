@@ -277,15 +277,10 @@ PRESUPUESTO DISPONIBLE: ${b:,}
 {fase_block},
     "estrategia_entrada": {{
         "recomendado": true,
-        "razonamiento": "2-3 oraciones honestas sobre por qué sí o no entrar",
+        "razonamiento": "2-3 oraciones basadas en datos: vendedores pequeños activos, inversión vs presupuesto, margen esperado. NO inventes cifras — el sistema ya calculó la inversión.",
         "angulo_diferenciacion": "Cómo diferenciarse de la competencia existente",
         "precio_objetivo": "$XX.XX - razón del precio",
         "rating_objetivo": "X.X+ estrellas"
-    }},
-    "estimacion_costos": {{
-        "margen_rango": "XX-XX% (rango estimado, no número exacto)",
-        "inversion_minima": "$X,XXX - $X,XXX (primer pedido + envío + FBA)",
-        "breakeven_meses": "X-X meses (estimación conservadora)"
     }},
     "volumen_minimo_viable": {{
         "unidades_breakeven": "XX unidades/mes mínimo para ser rentable",
@@ -351,13 +346,15 @@ PRESUPUESTO DISPONIBLE: ${b:,}
 REGLAS CLAVE:
 - FILOSOFÍA: ¿Puede un vendedor PEQUEÑO HACER DINERO? No importa si puede ser #1. Evalúa si alguien en posición #40 puede ser rentable.
 - Que existan gigantes NO es NO-GO. Lo que importa: ¿hay vendedores <500 reviews vendiendo? Si sí, hay espacio.
-- Los datos de INVERSIÓN PARA SER VIABLE ya están calculados por el sistema. NO reinventes esos números. Úsalos para contextualizar y validar, no para inventar cifras diferentes.
+- Los datos de INVERSIÓN PARA SER VIABLE ya están calculados por el sistema (Vine, PPC, inventario, breakeven). NO reinventes esos números. NO inventes tu propia estimación de costos. Úsalos tal cual para tu análisis.
+- Para decidir si recomendar entrada: compara la inversión calculada vs el presupuesto del usuario. Si la inversión calculada <= presupuesto, es viable financieramente. Si no, indica cuánto falta pero NO digas "no entrar" solo por eso — el usuario puede ahorrar.
 - Revenue Entrada = lo que ganaría un nuevo vendedor (conservador). Evalúa si justifica la inversión calculada.
 - Sé CONCISO. Oraciones cortas. Sin fluff. Los datos hablan. Máximo 3 ideas de producto, 3 riesgos, 5 sub-nichos.
 - Sé honesto. CAUTELA o NO-GO honesto > GO forzado. Si los datos no justifican entrada, dilo claro.
-- NO inventes números exactos (CPC, FOB, ROI). Usa rangos.
+- NO inventes números exactos (CPC, FOB, ROI, inversión). Usa los números del sistema o rangos generales.
 - Si keyword es genérica, sugiere sub-nichos con keywords REALES de Amazon.
 - Ventana de precio: busca rangos con vendedores pequeños activos — ahí es donde se puede entrar.
+- Próximos pasos deben ser ACCIONABLES y CONCRETOS, no "incrementar presupuesto" ni "investigar más".
 
 Analiza estos datos de Amazon US:
 
@@ -462,16 +459,6 @@ Responde SOLO con JSON válido (sin markdown, sin ```):
                 "private_label_investment": phase_raw.get("inversion_marca_privada", ""),
             }
 
-        # Cost estimate (new)
-        cost_raw = es.get("estimacion_costos", {})
-        cost_estimate = None
-        if cost_raw:
-            cost_estimate = {
-                "margin_range": cost_raw.get("margen_rango", ""),
-                "min_investment": cost_raw.get("inversion_minima", ""),
-                "breakeven_months": cost_raw.get("breakeven_meses", ""),
-            }
-
         # PPC (simplified)
         ppc_raw = es.get("ppc", es.get("estrategia_ppc", {}))
         ppc_strategy = None
@@ -518,7 +505,6 @@ Responde SOLO con JSON válido (sin markdown, sin ```):
             "go_no_go": go_no_go,
             "min_viable_volume": min_viable_volume,
             "phase_recommendation": phase_recommendation,
-            "cost_estimate": cost_estimate,
             "entry_strategy": {
                 "recommended": entry.get("recomendado", False),
                 "reasoning": entry.get("razonamiento", ""),
