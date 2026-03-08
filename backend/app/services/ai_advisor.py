@@ -634,8 +634,11 @@ Responde SOLO con JSON válido (sin markdown):
             "any": "cualquier tipo (consumibles y no-consumibles)",
         }.get(profile.product_type, "consumibles")
 
+        profile_prompt = self._build_profile_prompt(profile, b)
+
         prompt = f"""Eres un experto en productos para Amazon. RESPONDE TODO EN ESPAÑOL.
-Tu cliente tiene ${b:,} USD para invertir.
+
+{profile_prompt}
 
 Genera 5 ideas ESPECÍFICAS de productos {product_type_label} basado en estos datos:
 

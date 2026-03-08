@@ -27,7 +27,7 @@ async def get_user_profile() -> UserProfile:
     doc = await _get_profile_doc()
     if not doc:
         return UserProfile()
-    return UserProfile(**{k: v for k, v in doc.items() if k not in ("_id", "updated_at")})
+    return UserProfile(**{k: v for k, v in doc.items() if k not in ("_id", "updated_at", "active_saved_id")})
 
 
 @router.get("")
@@ -35,7 +35,7 @@ async def get_profile():
     doc = await _get_profile_doc()
     if not doc:
         return UserProfileResponse()
-    return UserProfileResponse(**{k: v for k, v in doc.items() if k != "_id"})
+    return UserProfileResponse(**{k: v for k, v in doc.items() if k not in ("_id", "active_saved_id")})
 
 
 @router.put("")
