@@ -1043,7 +1043,9 @@ class NicheAnalyzer:
 
         # Organic reviews needed after Vine
         organic_reviews_needed = max(0, review_target - vine_reviews)
+        # Cap organic sales needed — a new seller won't PPC their way to 8K sales
         sales_for_organic = organic_reviews_needed / 0.015 if organic_reviews_needed > 0 else 0
+        sales_for_organic = min(sales_for_organic, 3000)  # realistic PPC campaign cap
 
         # PPC cost based on niche competitiveness
         if best_range_median >= 500:
@@ -1061,6 +1063,7 @@ class NicheAnalyzer:
 
         ppc_cost_per_sale = estimated_cpc / conversion_new if conversion_new > 0 else 0
         ppc_total = round(sales_for_organic * ppc_cost_per_sale)
+        ppc_total = min(ppc_total, 15000)  # hard cap — no sane seller spends more on PPC alone
 
         # Initial inventory (200 units typical first order)
         initial_units = 200
@@ -1301,19 +1304,46 @@ class NicheAnalyzer:
                 "small_sellers": small_sellers,
             })
 
-        # Find best range: low avg_reviews + has_demand + count > 1
+        # Find best range for a NEW small seller.
+        # Priority: small sellers present > low reviews > near median price > demand
+        median_price = statistics.median(prices) if prices else 20
         best = None
         best_score = -1
         for r in ranges:
-            s = 0
-            if r["has_demand"]:
-                s += 50
-            if r["entry_ease"] == "Fácil":
+            s = 0.0
+            # Small sellers present (most important — proof others survive)
+            small = r.get("small_sellers", 0)
+            s += min(small * 12, 60)  # up to 60 pts for 5+ small sellers
+            # Lower reviews = easier entry
+            med_rev = r["avg_reviews"]
+            if med_rev < 50:
                 s += 40
-            elif r["entry_ease"] == "Moderado":
-                s += 20
+            elif med_rev < 150:
+                s += 30
+            elif med_rev < 500:
+                s += 15
+            elif med_rev < 1000:
+                s += 5
+            # else: 0 — very hard
+            # Demand signal
+            if r["has_demand"]:
+                s += 15
+            # Proximity to median price (ranges far from median are less relevant)
+            range_label = r["range"]  # e.g. "$20-30"
+            try:
+                parts = range_label.replace("$", "").split("-")
+                range_mid = (float(parts[0]) + float(parts[1])) / 2
+                distance_pct = abs(range_mid - median_price) / max(median_price, 1)
+                if distance_pct < 0.3:
+                    s += 20  # very close to median
+                elif distance_pct < 0.6:
+                    s += 10
+                # else: no bonus — far from typical price
+            except (ValueError, IndexError):
+                pass
+            # Enough products to be meaningful
             if r["count"] >= 3:
-                s += 10
+                s += 5
             if s > best_score:
                 best_score = s
                 best = r["range"]
