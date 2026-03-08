@@ -172,8 +172,8 @@ class NicheAnalyzer:
             keyword, demand_score, competition_score, price_score, quality_gap_score, opportunity_score,
         )
 
-        # Revenue estimate — prefer Keepa BSR-based sales if available
-        revenue_estimate = self._estimate_monthly_revenue(raw_products, avg_price, keepa_data)
+        # Revenue estimate — use median price (resistant to outliers)
+        revenue_estimate = self._estimate_monthly_revenue(raw_products, median_price or avg_price, keepa_data)
 
         # Extended metrics
         n = len(raw_products)
@@ -1035,24 +1035,25 @@ class NicheAnalyzer:
         return {"best_range": best or "Sin datos", "ranges": ranges}
 
     def _estimate_monthly_revenue(
-        self, products: list[dict], avg_price: float | None,
+        self, products: list[dict], price: float | None,
         keepa: dict | None = None,
     ) -> float | None:
         """Estimate monthly revenue per seller.
 
+        Uses median price (outlier-resistant) × estimated units.
         Priority:
         1. Keepa BSR-based sales estimate (most reliable)
         2. Scraper "monthly_bought" text
         3. Review-to-sales ratio fallback
         """
-        if not avg_price or not products:
+        if not price or not products:
             return None
 
         # 1. Keepa BSR-based estimate
         if keepa and keepa.get("sales_estimate"):
             median_units = keepa["sales_estimate"]["median_monthly_units"]
             if median_units > 0:
-                return round(median_units * avg_price, 2)
+                return round(median_units * price, 2)
 
         # 2. Scraper monthly_bought text
         bought_texts = [p["monthly_bought"] for p in products if p.get("monthly_bought")]
@@ -1060,14 +1061,14 @@ class NicheAnalyzer:
             bought_nums = [self._parse_monthly_bought(t) for t in bought_texts]
             if bought_nums:
                 median_monthly_units = statistics.median(bought_nums)
-                return round(median_monthly_units * avg_price, 2)
+                return round(median_monthly_units * price, 2)
 
         # 3. Fallback: review-to-sales ratio (~1 review per 20 sales, last 12 months)
         reviews = [p["reviews_count"] for p in products if p.get("reviews_count") is not None and p["reviews_count"] > 0]
         if reviews:
             median_reviews = statistics.median(reviews)
             estimated_monthly_units = (median_reviews / 24) * 20
-            return round(estimated_monthly_units * avg_price, 2)
+            return round(estimated_monthly_units * price, 2)
 
         return None
 
