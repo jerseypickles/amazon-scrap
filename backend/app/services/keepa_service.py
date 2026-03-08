@@ -6,9 +6,11 @@ evolution to enrich niche analysis with temporal context.
 from __future__ import annotations
 
 import logging
+import math
 import statistics
 from datetime import datetime, timezone
 
+import numpy as np
 import keepa
 
 from app.config import settings
@@ -66,7 +68,7 @@ class KeepaService:
             )
             return None
 
-        if not products:
+        if products is None or len(products) == 0:
             return None
 
         # Collect per-product summaries
@@ -120,12 +122,12 @@ class KeepaService:
 
     def _analyze_bsr(self, data: dict, stats: dict, days: int) -> dict | None:
         """Extract BSR trend and estimate monthly sales."""
-        sales = data.get("SALES")
-        if sales is None or not hasattr(sales, "__len__") or len(sales) == 0:
+        sales = _get_array(data, "SALES")
+        if sales is None or len(sales) == 0:
             return None
 
         # Filter valid values (non-NaN, > 0)
-        valid = [v for v in sales if v is not None and not _is_nan(v) and v > 0]
+        valid = [float(v) for v in sales if _is_valid(v) and v > 0]
         if len(valid) < 2:
             return None
 
@@ -168,12 +170,14 @@ class KeepaService:
     def _analyze_price(self, data: dict, stats: dict, days: int) -> dict | None:
         """Extract price stability metrics."""
         # Try Amazon price first, then new (3rd party)
-        prices = data.get("AMAZON") or data.get("NEW")
-        if prices is None or not hasattr(prices, "__len__") or len(prices) == 0:
+        prices = _get_array(data, "AMAZON")
+        if prices is None or len(prices) == 0:
+            prices = _get_array(data, "NEW")
+        if prices is None or len(prices) == 0:
             return None
 
         # Keepa stores prices in cents; convert to dollars
-        valid = [v / 100.0 for v in prices if v is not None and not _is_nan(v) and v > 0]
+        valid = [float(v) / 100.0 for v in prices if _is_valid(v) and v > 0]
         if len(valid) < 2:
             return None
 
@@ -221,11 +225,11 @@ class KeepaService:
 
     def _analyze_sellers(self, data: dict, stats: dict, days: int) -> dict | None:
         """Extract seller count dynamics."""
-        counts = data.get("COUNT_NEW")
-        if counts is None or not hasattr(counts, "__len__") or len(counts) == 0:
+        counts = _get_array(data, "COUNT_NEW")
+        if counts is None or len(counts) == 0:
             return None
 
-        valid = [int(v) for v in counts if v is not None and not _is_nan(v) and v >= 0]
+        valid = [int(v) for v in counts if _is_valid(v) and v >= 0]
         if len(valid) < 2:
             return None
 
@@ -253,12 +257,12 @@ class KeepaService:
 
     def _analyze_rating(self, data: dict, stats: dict) -> dict | None:
         """Extract rating evolution."""
-        ratings = data.get("RATING")
-        if ratings is None or not hasattr(ratings, "__len__") or len(ratings) == 0:
+        ratings = _get_array(data, "RATING")
+        if ratings is None or len(ratings) == 0:
             return None
 
         # Keepa stores ratings as 0-50 integers (divide by 10 for stars)
-        valid = [v / 10.0 for v in ratings if v is not None and not _is_nan(v) and v > 0]
+        valid = [float(v) / 10.0 for v in ratings if _is_valid(v) and v > 0]
         if len(valid) < 2:
             return None
 
@@ -449,15 +453,33 @@ class KeepaService:
 
 
 # ------------------------------------------------------------------
-# Module-level helpers
+# Module-level helpers (numpy-safe)
 # ------------------------------------------------------------------
 
-def _is_nan(v) -> bool:
-    """Check for NaN in a way that works with plain floats and numpy."""
-    try:
-        return v != v  # NaN != NaN is True
-    except (TypeError, ValueError):
+def _is_valid(v) -> bool:
+    """Return True if *v* is a usable numeric value (not None/NaN)."""
+    if v is None:
         return False
+    try:
+        return not (math.isnan(float(v)))
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
+def _get_array(data: dict, key: str) -> list | None:
+    """Safely extract a history array from Keepa data dict.
+
+    The keepa SDK returns numpy arrays; convert to plain Python list
+    to avoid 'ambiguous truth value' errors downstream.
+    """
+    arr = data.get(key)
+    if arr is None:
+        return None
+    if isinstance(arr, np.ndarray):
+        return arr.tolist()
+    if hasattr(arr, "__len__"):
+        return list(arr)
+    return None
 
 
 # Singleton
