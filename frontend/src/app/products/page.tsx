@@ -30,6 +30,22 @@ function timeAgo(dateStr: string | null) {
   return `Hace ${days}d`;
 }
 
+/** Parse "10K+ bought in past month" → 10000, "500+" → 500, etc. */
+function parseMonthlyBought(raw: string | null): number | null {
+  if (!raw) return null;
+  const m = raw.match(/([\d,.]+)\s*[Kk]\+?/);
+  if (m) return Math.round(parseFloat(m[1].replace(",", "")) * 1000);
+  const n = raw.match(/([\d,.]+)\+?/);
+  if (n) return Math.round(parseFloat(n[1].replace(",", "")));
+  return null;
+}
+
+function formatRevenue(amount: number): string {
+  if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)}M`;
+  if (amount >= 1_000) return `$${(amount / 1_000).toFixed(0)}K`;
+  return `$${amount.toFixed(0)}`;
+}
+
 function priceDelta(snapshots: ProductSnapshot[]): { pct: number; direction: string } | null {
   if (snapshots.length < 2) return null;
   const recent = snapshots[snapshots.length - 1];
@@ -945,6 +961,7 @@ export default function ProductTrackerPage() {
                               <Flame size={8} /> {p.current_monthly_bought}
                             </span>
                           )}
+                          {(() => { const units = parseMonthlyBought(p.current_monthly_bought); const rev = units && p.current_price ? units * p.current_price : null; return rev ? <span className="text-[8px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-0.5" style={{ background: "rgba(16,185,129,0.1)", color: "#10b981" }}><DollarSign size={8} /> ~{formatRevenue(rev)}/mes</span> : null; })()}
                           {p.has_coupon && (
                             <span className="text-[8px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-0.5" style={{ background: "rgba(239,68,68,0.12)", color: "#ef4444" }}>
                               <Tag size={8} /> COUPON

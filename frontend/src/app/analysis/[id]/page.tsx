@@ -18,6 +18,22 @@ import type { NicheAnalysis, AIInsight, Product, ScoreBreakdown, QuickCheckResul
 
 interface ChatMessage { role: "user" | "assistant"; content: string; }
 
+/** Parse "10K+ bought in past month" → 10000, "500+" → 500, etc. */
+function parseMonthlyBought(raw: string | null): number | null {
+  if (!raw) return null;
+  const m = raw.match(/([\d,.]+)\s*[Kk]\+?/);
+  if (m) return Math.round(parseFloat(m[1].replace(",", "")) * 1000);
+  const n = raw.match(/([\d,.]+)\+?/);
+  if (n) return Math.round(parseFloat(n[1].replace(",", "")));
+  return null;
+}
+
+function formatRevenue(amount: number): string {
+  if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)}M`;
+  if (amount >= 1_000) return `$${(amount / 1_000).toFixed(0)}K`;
+  return `$${amount.toFixed(0)}`;
+}
+
 function scoreColor(s: number | null) {
   if (s === null) return "var(--text-muted)";
   if (s >= 70) return "#10b981";
@@ -158,6 +174,7 @@ function ProductCard({ p, rank, onTrack, tracking }: { p: Product; rank: number;
           {p.is_best_seller && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-0.5" style={{ background: "rgba(249,115,22,0.12)", color: "#f97316" }}><Award size={8} /> BEST SELLER</span>}
           {p.is_amazon_choice && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-0.5" style={{ background: "rgba(16,185,129,0.12)", color: "#10b981" }}><BadgeCheck size={8} /> CHOICE</span>}
           {p.monthly_bought && <span className="text-[8px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-0.5" style={{ background: "rgba(239,68,68,0.1)", color: "#ef4444" }}><Flame size={8} /> {p.monthly_bought}</span>}
+          {(() => { const units = parseMonthlyBought(p.monthly_bought); const rev = units && p.price ? units * p.price : null; return rev ? <span className="text-[8px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-0.5" style={{ background: "rgba(16,185,129,0.1)", color: "#10b981" }}><DollarSign size={8} /> ~{formatRevenue(rev)}/mes</span> : null; })()}
         </div>
         <div className="flex items-center gap-3 mt-1.5">
           {p.price ? (
