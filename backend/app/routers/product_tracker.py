@@ -4,7 +4,6 @@ from fastapi import APIRouter, HTTPException
 
 from app.schemas.watchlist import TrackProductRequest, TrackedProductResponse
 from app.services.product_tracker import product_tracker
-from app.services.keepa_service import keepa_service
 
 router = APIRouter(prefix="/api/tracked-products", tags=["product-tracker"])
 
@@ -77,22 +76,6 @@ async def get_stats():
 @router.get("/check/{asin}")
 async def check_tracked(asin: str):
     return await product_tracker.check_tracked(asin)
-
-
-@router.get("/debug/keepa/{asin}")
-async def debug_keepa(asin: str):
-    """Temporary debug endpoint to test Keepa for a single ASIN."""
-    result = {"enabled": keepa_service.enabled, "asin": asin}
-    if not keepa_service.enabled:
-        result["error"] = "Keepa API key not configured"
-        return result
-    try:
-        enrichment = await keepa_service.enrich_asins([asin], days=90)
-        result["enrichment"] = enrichment
-        result["enrichment_is_none"] = enrichment is None
-    except Exception as e:
-        result["error"] = f"{type(e).__name__}: {e}"
-    return result
 
 
 @router.get("/{product_id}")

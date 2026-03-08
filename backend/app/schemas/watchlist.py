@@ -145,6 +145,16 @@ class TrackedProductResponse(BaseModel):
     buy_box_seller: str | None = None
     lowest_offer_price: float | None = None
     fba_seller_count: int | None = None
+    # Keepa historical data
+    keepa_trend: dict | None = None
+    keepa_seasonality: dict | None = None
+    keepa_price_stability: dict | None = None
+    keepa_seller_dynamics: dict | None = None
+    keepa_rating_evolution: dict | None = None
+    keepa_sales_estimate: dict | None = None
+    keepa_data_confidence: int | None = None
+    keepa_products_analyzed: int | None = None
+    keepa_last_updated: str | None = None
     # Tracking
     snapshots: list[ProductSnapshot] = []
     check_interval_hours: int = 24
