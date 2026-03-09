@@ -132,11 +132,14 @@ PRESUPUESTO DISPONIBLE: ${b:,}
         # Launch investment (calculated by backend)
         launch_inv = analysis_data.get('launch_investment')
         if launch_inv and isinstance(launch_inv, dict):
+            evidence = "Sí (basado en sellers indie reales)" if launch_inv.get('evidence_based') else "No (estimado conservador)"
             ctx += f"\nINVERSIÓN PARA SER VIABLE (calculado por el sistema):\n"
+            ctx += f"- Basado en evidencia real: {evidence}\n"
             ctx += f"- Reviews necesarias para competir: ~{launch_inv.get('review_target', 'N/A')}\n"
             ctx += f"- Mediana reviews del mejor rango: {launch_inv.get('best_range_median_reviews', 'N/A')}\n"
             ctx += f"- Costo Vine (30 uds regaladas, ~25 reviews): ${launch_inv.get('vine_cost', 'N/A')}\n"
-            ctx += f"- PPC estimado para alcanzar reviews: ${launch_inv.get('ppc_total_estimate', 'N/A')}\n"
+            ctx += f"- PPC lanzamiento: ${launch_inv.get('ppc_total_estimate', 'N/A')} (${launch_inv.get('ppc_daily_budget', 'N/A')}/día × {launch_inv.get('ppc_launch_days', 'N/A')} días)\n"
+            ctx += f"- Ventas esperadas vía PPC: ~{launch_inv.get('estimated_ppc_sales', 'N/A')}\n"
             ctx += f"- Inventario inicial (200 uds): ${launch_inv.get('inventory_cost', 'N/A')}\n"
             ctx += f"- TOTAL inversión para lanzar: ${launch_inv.get('total_investment', 'N/A')}\n"
             ctx += f"- Breakeven estimado: ~{launch_inv.get('breakeven_months', 'N/A')} meses\n"

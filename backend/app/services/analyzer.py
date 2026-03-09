@@ -237,6 +237,7 @@ class NicheAnalyzer:
         # Launch investment calculation — realistic cost to enter this niche
         launch_investment = self._calc_launch_investment(
             ref_price, estimated_margin, price_opportunity, keepa_data,
+            newcomer_success=newcomer_success,
         )
 
         # Entrant viability — can a new small seller make money?
@@ -1062,16 +1063,26 @@ class NicheAnalyzer:
     def _calc_launch_investment(
         self, ref_price: float | None, estimated_margin: float | None,
         price_opportunity: dict | None, keepa: dict | None,
+        newcomer_success: dict | None = None,
     ) -> dict | None:
         """Calculate realistic launch investment for a new seller.
 
-        Returns review target, Vine cost, PPC estimate, inventory cost,
-        total investment, monthly burn rate, and breakeven months.
+        Uses newcomer_success evidence (real indie sellers already selling
+        in the niche) to set realistic review targets and PPC budgets
+        instead of basing everything on established-product median reviews.
+
+        PPC is modeled as a daily budget over a launch campaign period,
+        which reflects how sellers actually use Amazon Ads.
         """
         if not ref_price or ref_price <= 0:
             return None
 
-        # Best range median reviews (how many reviews to be competitive)
+        ns = newcomer_success or {}
+        verdict = ns.get("verdict", "Sin evidencia")
+        indie_examples = ns.get("indie_examples", [])
+        genuine_indie = ns.get("genuine_indie", 0)
+
+        # Best range median reviews (context, not the sole driver anymore)
         best_range_name = (price_opportunity or {}).get("best_range")
         best_range_median = None
         if best_range_name and price_opportunity:
@@ -1082,9 +1093,18 @@ class NicheAnalyzer:
         if best_range_median is None:
             best_range_median = 200  # conservative default
 
-        # Review target: ~30% of median, clamped between 30-150
-        review_target = max(30, round(best_range_median * 0.3))
-        review_target = min(review_target, 150)
+        # ── Review target: evidence-based when possible ──
+        evidence_based = False
+        if indie_examples and verdict in ("Próspero", "Viable"):
+            # Use average reviews of real indie sellers as baseline
+            avg_indie_rev = sum(e["reviews"] for e in indie_examples) / len(indie_examples)
+            review_target = max(30, round(avg_indie_rev * 0.8))
+            review_target = min(review_target, 150)
+            evidence_based = True
+        else:
+            # No indie evidence → conservative estimate from range median
+            review_target = max(30, round(best_range_median * 0.3))
+            review_target = min(review_target, 150)
 
         # Vine: 30 units given away
         vine_units = 30
@@ -1092,29 +1112,44 @@ class NicheAnalyzer:
         vine_cost = round(vine_units * unit_cost)
         vine_reviews = 25
 
-        # Organic reviews needed after Vine
-        organic_reviews_needed = max(0, review_target - vine_reviews)
-        # Cap organic sales needed — a new seller won't PPC their way to 8K sales
-        sales_for_organic = organic_reviews_needed / 0.015 if organic_reviews_needed > 0 else 0
-        sales_for_organic = min(sales_for_organic, 3000)  # realistic PPC campaign cap
-
-        # PPC cost based on niche competitiveness
-        if best_range_median >= 500:
-            estimated_cpc = 2.00
-            conversion_new = 0.04
-        elif best_range_median >= 200:
-            estimated_cpc = 1.50
-            conversion_new = 0.06
-        elif best_range_median >= 50:
-            estimated_cpc = 1.00
-            conversion_new = 0.08
+        # ── PPC: daily budget × launch campaign days ──
+        # Minimum $15/day so Amazon has enough data to optimize the campaign.
+        # Scales with product price but capped at reasonable levels.
+        if review_target >= 120:
+            daily_ppc_budget = max(20, min(ref_price * 0.8, 50))
+        elif review_target >= 60:
+            daily_ppc_budget = max(15, min(ref_price * 0.6, 40))
         else:
-            estimated_cpc = 0.60
-            conversion_new = 0.10
+            daily_ppc_budget = max(15, min(ref_price * 0.5, 30))
+
+        # Launch campaign duration depends on niche difficulty
+        if verdict == "Próspero":
+            launch_days = 60
+        elif verdict == "Viable":
+            launch_days = 75
+        elif verdict == "Limitado":
+            launch_days = 90
+        else:
+            launch_days = 90
+
+        ppc_total = round(daily_ppc_budget * launch_days)
+
+        # CPC / conversion estimates (informational for the user)
+        if review_target >= 120:
+            estimated_cpc, conversion_new = 1.50, 0.06
+        elif review_target >= 60:
+            estimated_cpc, conversion_new = 1.00, 0.08
+        else:
+            estimated_cpc, conversion_new = 0.70, 0.10
+
+        # Indie evidence boosts expected conversion (proven demand for new sellers)
+        if verdict == "Próspero" and genuine_indie >= 5:
+            conversion_new = min(conversion_new + 0.02, 0.15)
+        elif verdict == "Viable" and genuine_indie >= 3:
+            conversion_new = min(conversion_new + 0.01, 0.12)
 
         ppc_cost_per_sale = estimated_cpc / conversion_new if conversion_new > 0 else 0
-        ppc_total = round(sales_for_organic * ppc_cost_per_sale)
-        ppc_total = min(ppc_total, 15000)  # hard cap — no sane seller spends more on PPC alone
+        estimated_ppc_sales = round(ppc_total / ppc_cost_per_sale) if ppc_cost_per_sale > 0 else 0
 
         # Initial inventory (200 units typical first order)
         initial_units = 200
@@ -1125,9 +1160,7 @@ class NicheAnalyzer:
 
         # Breakeven estimation
         margin_pct = estimated_margin or 30
-        monthly_profit_per_unit = ref_price * (margin_pct / 100)
-        # Conservative: 2-5 sales/day for a new seller reaching review target
-        daily_sales_at_target = max(2, min(sales_for_organic / 90, 8)) if sales_for_organic > 0 else 3
+        daily_sales_at_target = max(2, min(estimated_ppc_sales / launch_days + 1, 8))
         monthly_revenue_at_target = daily_sales_at_target * 30 * ref_price
         monthly_profit_at_target = monthly_revenue_at_target * (margin_pct / 100)
 
@@ -1137,16 +1170,21 @@ class NicheAnalyzer:
             breakeven_months = 12
         breakeven_months = min(breakeven_months, 12)
 
-        # Time to reach review target
-        months_to_reviews = max(3, round(review_target / 10))  # ~10 reviews/month with Vine+organic
+        # Time to reach review target (Vine spread over ~2 months + organic)
+        reviews_per_month = vine_reviews / 2 + (daily_sales_at_target * 30 * 0.015)
+        months_to_reviews = max(3, round(review_target / max(reviews_per_month, 1)))
         months_to_reviews = min(months_to_reviews, 12)
 
         return {
             "review_target": review_target,
             "best_range_median_reviews": round(best_range_median),
+            "evidence_based": evidence_based,
             "vine_cost": vine_cost,
             "vine_reviews": vine_reviews,
             "ppc_total_estimate": ppc_total,
+            "ppc_daily_budget": round(daily_ppc_budget, 2),
+            "ppc_launch_days": launch_days,
+            "estimated_ppc_sales": estimated_ppc_sales,
             "inventory_cost": inventory_cost,
             "total_investment": total_investment,
             "breakeven_months": breakeven_months,

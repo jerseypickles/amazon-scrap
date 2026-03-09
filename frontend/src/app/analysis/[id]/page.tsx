@@ -508,7 +508,9 @@ export default function AnalysisDetailPage() {
               <div className="flex items-center gap-2 mb-3">
                 <DollarSign size={15} color="var(--accent)" />
                 <h4 className="text-sm font-bold">Inversi&oacute;n para Lanzar</h4>
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: "rgba(249,115,22,0.1)", color: "var(--accent)" }}>Calculado</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: analysis.launch_investment.evidence_based ? "rgba(16,185,129,0.1)" : "rgba(249,115,22,0.1)", color: analysis.launch_investment.evidence_based ? "#10b981" : "var(--accent)" }}>
+                  {analysis.launch_investment.evidence_based ? "Basado en evidencia" : "Estimado conservador"}
+                </span>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                 <div className="p-2 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
@@ -517,9 +519,11 @@ export default function AnalysisDetailPage() {
                   <p className="text-[8px]" style={{ color: "var(--text-muted)" }}>~{analysis.launch_investment.vine_reviews} reviews</p>
                 </div>
                 <div className="p-2 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
-                  <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>PPC Estimado</p>
+                  <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>PPC Lanzamiento</p>
                   <p className="text-sm font-bold" style={{ color: "#f59e0b" }}>${analysis.launch_investment.ppc_total_estimate.toLocaleString()}</p>
-                  <p className="text-[8px]" style={{ color: "var(--text-muted)" }}>CPC ~${analysis.launch_investment.estimated_cpc}, conv {(analysis.launch_investment.conversion_rate_new * 100).toFixed(0)}%</p>
+                  <p className="text-[8px]" style={{ color: "var(--text-muted)" }}>
+                    ${analysis.launch_investment.ppc_daily_budget}/d&iacute;a &times; {analysis.launch_investment.ppc_launch_days} d&iacute;as
+                  </p>
                 </div>
                 <div className="p-2 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
                   <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Inventario (200 uds)</p>
@@ -530,12 +534,19 @@ export default function AnalysisDetailPage() {
                   <p className="text-lg font-black" style={{ color: "var(--accent)" }}>${analysis.launch_investment.total_investment.toLocaleString()}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="p-2 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
                   <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Reviews Necesarias</p>
                   <p className="text-sm font-bold">~{analysis.launch_investment.review_target} reviews</p>
                   <p className="text-[8px]" style={{ color: "var(--text-muted)" }}>
-                    ~{analysis.launch_investment.months_to_review_target} meses (Vine + org&aacute;nicas) &middot; Mediana del rango: {analysis.launch_investment.best_range_median_reviews}
+                    ~{analysis.launch_investment.months_to_review_target} meses (Vine + org&aacute;nicas)
+                  </p>
+                </div>
+                <div className="p-2 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
+                  <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>PPC Esperado</p>
+                  <p className="text-sm font-bold">~{analysis.launch_investment.estimated_ppc_sales} ventas</p>
+                  <p className="text-[8px]" style={{ color: "var(--text-muted)" }}>
+                    CPC ~${analysis.launch_investment.estimated_cpc} &middot; conv {(analysis.launch_investment.conversion_rate_new * 100).toFixed(0)}%
                   </p>
                 </div>
                 <div className="p-2 rounded-lg" style={{ background: "var(--bg-elevated)" }}>

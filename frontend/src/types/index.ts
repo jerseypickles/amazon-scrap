@@ -74,9 +74,13 @@ export interface PriceRange {
 export interface LaunchInvestment {
   review_target: number;
   best_range_median_reviews: number;
+  evidence_based: boolean;
   vine_cost: number;
   vine_reviews: number;
   ppc_total_estimate: number;
+  ppc_daily_budget: number;
+  ppc_launch_days: number;
+  estimated_ppc_sales: number;
   inventory_cost: number;
   total_investment: number;
   breakeven_months: number;
