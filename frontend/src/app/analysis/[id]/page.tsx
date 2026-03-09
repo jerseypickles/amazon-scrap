@@ -548,6 +548,70 @@ export default function AnalysisDetailPage() {
             </div>
           )}
 
+          {/* Newcomer Success — are genuine indie sellers thriving? */}
+          {analysis.newcomer_success && (
+            <div className="card" style={{ border: `1px solid ${
+              analysis.newcomer_success.verdict === "Próspero" ? "rgba(16,185,129,0.3)" :
+              analysis.newcomer_success.verdict === "Viable" ? "rgba(245,158,11,0.3)" :
+              "rgba(239,68,68,0.2)"
+            }` }}>
+              <div className="flex items-center gap-2 mb-3">
+                <Users size={15} color={
+                  analysis.newcomer_success.verdict === "Próspero" ? "#10b981" :
+                  analysis.newcomer_success.verdict === "Viable" ? "#f59e0b" : "#ef4444"
+                } />
+                <h4 className="text-sm font-bold">Vendedores Nuevos Genuinos</h4>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{
+                  background: analysis.newcomer_success.verdict === "Próspero" ? "rgba(16,185,129,0.1)" :
+                    analysis.newcomer_success.verdict === "Viable" ? "rgba(245,158,11,0.1)" : "rgba(239,68,68,0.1)",
+                  color: analysis.newcomer_success.verdict === "Próspero" ? "#10b981" :
+                    analysis.newcomer_success.verdict === "Viable" ? "#f59e0b" : "#ef4444",
+                }}>{analysis.newcomer_success.verdict}</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                <div className="p-2 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
+                  <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Indies genuinos</p>
+                  <p className="text-sm font-bold" style={{ color: "#10b981" }}>{analysis.newcomer_success.genuine_indie}</p>
+                  <p className="text-[8px]" style={{ color: "var(--text-muted)" }}>{analysis.newcomer_success.indie_pct}% del nicho</p>
+                </div>
+                <div className="p-2 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
+                  <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Marcas grandes (listing nuevo)</p>
+                  <p className="text-sm font-bold" style={{ color: "#6366f1" }}>{analysis.newcomer_success.established_new_listing}</p>
+                  <p className="text-[8px]" style={{ color: "var(--text-muted)" }}>no cuentan como entrantes</p>
+                </div>
+                <div className="p-2 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
+                  <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Revenue share indies</p>
+                  <p className="text-sm font-bold" style={{ color: "#f59e0b" }}>{analysis.newcomer_success.indie_revenue_share_pct}%</p>
+                  <p className="text-[8px]" style={{ color: "var(--text-muted)" }}>del revenue total</p>
+                </div>
+                <div className="p-2 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
+                  <p className="text-[9px] font-bold uppercase" style={{ color: "var(--text-muted)" }}>Total peque&ntilde;os</p>
+                  <p className="text-sm font-bold">{analysis.newcomer_success.total_small}</p>
+                  <p className="text-[8px]" style={{ color: "var(--text-muted)" }}>&lt;500 reviews con ventas</p>
+                </div>
+              </div>
+              {analysis.newcomer_success.indie_examples.length > 0 && (
+                <div>
+                  <p className="text-[9px] font-bold uppercase mb-2" style={{ color: "var(--text-muted)" }}>Ejemplos de vendedores indie exitosos</p>
+                  <div className="space-y-1.5">
+                    {analysis.newcomer_success.indie_examples.map((ex, i) => (
+                      <div key={i} className="flex items-center justify-between text-xs p-1.5 rounded" style={{ background: "var(--bg-elevated)" }}>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{ex.brand}</span>
+                          <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{ex.reviews} rev &middot; {ex.rating}&#9733; &middot; ${ex.price}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{ex.monthly_bought}</span>
+                          <span className="font-bold" style={{ color: "#10b981" }}>~${ex.est_monthly_revenue.toLocaleString()}/mo</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Go/No-Go Checklist */}
           {aiInsight?.go_no_go && (
             <div className="card">

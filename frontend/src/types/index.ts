@@ -85,6 +85,25 @@ export interface LaunchInvestment {
   conversion_rate_new: number;
 }
 
+export interface NewcomerExample {
+  brand: string;
+  reviews: number;
+  price: number;
+  rating: number;
+  monthly_bought: string;
+  est_monthly_revenue: number;
+}
+
+export interface NewcomerSuccess {
+  total_small: number;
+  genuine_indie: number;
+  established_new_listing: number;
+  indie_pct: number;
+  indie_examples: NewcomerExample[];
+  indie_revenue_share_pct: number;
+  verdict: string;
+}
+
 export interface NicheAnalysis {
   id: number;
   keyword: string;
@@ -127,6 +146,7 @@ export interface NicheAnalysis {
   rating_distribution: { range: string; count: number }[];
   review_distribution: { range: string; count: number }[];
   launch_investment: LaunchInvestment | null;
+  newcomer_success: NewcomerSuccess | null;
   created_at: string | null;
   is_cached?: boolean;
 }

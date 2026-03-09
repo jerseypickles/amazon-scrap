@@ -18,6 +18,49 @@ logger = logging.getLogger(__name__)
 # How long before an analysis is considered stale and needs re-scraping
 ANALYSIS_FRESH_HOURS = 24
 
+# Well-known brands that ScraperAPI often splits into many brand-name variants.
+# Used to distinguish genuine indie sellers from established brands with new listings.
+_KNOWN_MEGA_BRANDS = frozenset({
+    "starbucks", "nespresso", "keurig", "green mountain", "folgers",
+    "maxwell house", "dunkin", "mccafe", "mccafé", "lavazza", "tim hortons",
+    "gevalia", "peet", "peets", "amazon", "amazonfresh",
+    "purina", "temptations", "friskies", "fancy feast", "meow mix", "iams",
+    "blue buffalo", "whiskas", "sheba", "felix", "rachael ray",
+    "loreal", "l'oreal", "redken", "ogx", "tresemme", "pantene", "garnier",
+    "dove", "schwarzkopf", "moroccanoil", "shea moisture", "aussie",
+    "colgate", "crest", "oral-b", "sensodyne", "listerine",
+    "tide", "persil", "gain", "all", "arm hammer",
+    "bounty", "charmin", "cottonelle", "scott", "quilted northern",
+    "glad", "hefty", "ziploc", "reynolds",
+    "energizer", "duracell", "rayovac",
+    "gillette", "schick", "harry's",
+    "samsung", "apple", "anker", "baseus",
+    "nestle", "kraft", "general mills", "kellogg", "quaker",
+})
+
+
+def _normalize_brand(brand_str: str | None) -> str:
+    """Extract a core brand identifier from ScraperAPI's brand field.
+
+    ScraperAPI often stuffs the product name into the brand field, e.g.
+    "Green Mountain Coffee Roasters Breakfast Blend" and
+    "Green Mountain Coffee Roasters Decaf" appear as separate brands.
+    This normalizes them to "green mountain" so we can count correctly.
+    """
+    if not brand_str:
+        return ""
+    b = brand_str.strip().lower()
+    for mega in _KNOWN_MEGA_BRANDS:
+        if b.startswith(mega):
+            return mega
+    # Fallback: first 2 meaningful words
+    words = re.split(r"[\s,]+", b)
+    skip = {"the", "by", "for", "and", "&", "with", "from", "in", "of", "a", "an"}
+    meaningful = [w for w in words if w not in skip and len(w) > 1]
+    if len(meaningful) >= 2:
+        return " ".join(meaningful[:2])
+    return meaningful[0] if meaningful else b
+
 
 class NicheAnalyzer:
     async def analyze_niche(
@@ -177,11 +220,16 @@ class NicheAnalyzer:
         revenue_tiers = self._estimate_revenue_tiers(raw_products, ref_price, keepa_data)
         revenue_estimate = revenue_tiers["revenue_mid"]
 
+        # Newcomer success — are genuine indie sellers thriving?
+        # Computed early so scoring functions can use it instead of raw small-seller count
+        newcomer_success = self._calc_newcomer_success(raw_products)
+
         # Opportunity scores — pass full product data + Keepa enrichment
         demand_score, demand_bd = self._calc_demand_score(raw_products, reviews, prices, keepa_data)
         competition_score, competition_bd = self._calc_competition_score(
             raw_products, reviews, brand_count, top3_share, keepa_data,
             saturation=saturation, price_opportunity=price_opportunity,
+            newcomer_success=newcomer_success,
         )
         price_score, price_bd = self._calc_price_score(prices, avg_price, median_price, keepa_data)
         quality_gap_score, quality_bd = self._calc_quality_gap_score(ratings, reviews, keepa_data)
@@ -195,6 +243,7 @@ class NicheAnalyzer:
         entrant_viability_score, entrant_viability_bd = self._calc_entrant_viability_score(
             raw_products, ref_price, estimated_margin, revenue_tiers, price_opportunity,
             launch_investment=launch_investment,
+            newcomer_success=newcomer_success,
         )
 
         # Final opportunity score: 25% Demand + 25% Competition + 20% Price + 10% Quality + 20% Entrant
@@ -263,6 +312,8 @@ class NicheAnalyzer:
             keepa_products_analyzed=keepa_data.get("keepa_products_analyzed") if keepa_data else None,
             # Launch investment
             launch_investment=launch_investment,
+            # Newcomer success analysis
+            newcomer_success=newcomer_success,
         )
 
         now = datetime.now(timezone.utc)
@@ -535,6 +586,7 @@ class NicheAnalyzer:
         keepa: dict | None = None,
         saturation: dict | None = None,
         price_opportunity: dict | None = None,
+        newcomer_success: dict | None = None,
     ) -> tuple[float, list[dict]]:
         """Competition = how hard is it to enter this niche?
         HIGH score = LOW competition (good for us).
@@ -555,28 +607,27 @@ class NicheAnalyzer:
         else:
             w_leaders, w_barrier, w_conc, w_div, w_badges, w_gap = 25, 20, 15, 10, 10, 20
 
-        # --- Signal 1: Small seller viability ---
-        small_sellers_active = sum(
-            1 for p in products
-            if (p.get("reviews_count") or 0) < 500 and p.get("monthly_bought")
-        )
-        small_ratio_pct = (small_sellers_active / n * 100) if n else 0
+        # --- Signal 1: Genuine indie seller viability ---
+        # Filters out big-brand new listings (e.g. Starbucks with 59 reviews)
+        nc = newcomer_success or self._calc_newcomer_success(products)
+        genuine_indie = nc["genuine_indie"]
+        indie_pct = nc["indie_pct"]
 
-        if small_ratio_pct >= 30:
+        if indie_pct >= 15:
             viability_score = 90
-        elif small_ratio_pct >= 20:
+        elif indie_pct >= 10:
             viability_score = 75
-        elif small_ratio_pct >= 15:
+        elif indie_pct >= 7:
             viability_score = 60
-        elif small_ratio_pct >= 10:
+        elif indie_pct >= 4:
             viability_score = 45
-        elif small_ratio_pct >= 5:
+        elif indie_pct >= 2:
             viability_score = 30
         else:
             viability_score = 15
         signal_val = round(viability_score * w_leaders / 100, 1)
         score += signal_val
-        breakdown.append({"signal": "Viabilidad del Pequeño", "value": f"{small_sellers_active} vendedores <500 rev vendiendo ({small_ratio_pct:.0f}%)", "score": viability_score, "weight": w_leaders, "weighted": signal_val})
+        breakdown.append({"signal": "Vendedores Indie Genuinos", "value": f"{genuine_indie} indie genuinos vendiendo ({indie_pct:.0f}%)", "score": viability_score, "weight": w_leaders, "weighted": signal_val})
 
         # --- Signal 2: Review barrier (NEW) ---
         # How many reviews do you need to be competitive? Use best price range median.
@@ -1104,12 +1155,117 @@ class NicheAnalyzer:
             "conversion_rate_new": conversion_new,
         }
 
+    @staticmethod
+    def _calc_newcomer_success(products: list[dict]) -> dict:
+        """Analyze whether genuine indie/new sellers are thriving in this niche.
+
+        Distinguishes between:
+        - Genuine indie sellers: single-product brands with <500 reviews
+        - Established brands' new listings: big brands that appear with
+          multiple products in the search results but happen to have a
+          low-review listing
+
+        Returns a dict with counts, examples, and revenue share data.
+        """
+        if not products:
+            return {
+                "total_small": 0, "genuine_indie": 0, "established_new_listing": 0,
+                "indie_examples": [], "indie_revenue_share_pct": 0,
+                "verdict": "Sin datos",
+            }
+
+        # Build normalized brand counts across ALL products
+        norm_counts: Counter = Counter()
+        for p in products:
+            norm = _normalize_brand(p.get("brand"))
+            if norm:
+                norm_counts[norm] += 1
+
+        multi_brands = {b for b, c in norm_counts.items() if c > 1}
+
+        # Parse monthly_bought text → number
+        def _parse_bought(text: str | None) -> int:
+            if not text:
+                return 0
+            t = str(text).lower()
+            m = re.search(r"([\d,.]+)\s*(k\+?)?", t)
+            if not m:
+                return 0
+            num = float(m.group(1).replace(",", ""))
+            if m.group(2) and "k" in m.group(2):
+                num *= 1000
+            return int(num)
+
+        # Separate small sellers (<500 reviews with sales)
+        small_with_sales = [
+            p for p in products
+            if (p.get("reviews_count") or 0) < 500 and p.get("monthly_bought")
+        ]
+
+        genuine = []
+        established_new = []
+        for p in small_with_sales:
+            norm = _normalize_brand(p.get("brand"))
+            if norm in multi_brands or not norm:
+                established_new.append(p)
+            else:
+                genuine.append(p)
+
+        # Revenue analysis
+        total_revenue_all = sum(
+            (p.get("price") or 0) * _parse_bought(p.get("monthly_bought"))
+            for p in products
+        )
+        indie_revenue = sum(
+            (p.get("price") or 0) * _parse_bought(p.get("monthly_bought"))
+            for p in genuine
+        )
+        indie_share = round(indie_revenue / total_revenue_all * 100, 1) if total_revenue_all > 0 else 0
+
+        # Build examples (sorted by reviews ascending — newest first)
+        genuine_sorted = sorted(genuine, key=lambda p: p.get("reviews_count") or 0)
+        examples = []
+        for p in genuine_sorted[:5]:
+            bought_num = _parse_bought(p.get("monthly_bought"))
+            est_monthly = (p.get("price") or 0) * bought_num
+            examples.append({
+                "brand": (p.get("brand") or "Sin marca")[:40],
+                "reviews": p.get("reviews_count") or 0,
+                "price": p.get("price") or 0,
+                "rating": p.get("rating") or 0,
+                "monthly_bought": p.get("monthly_bought") or "",
+                "est_monthly_revenue": round(est_monthly),
+            })
+
+        # Verdict
+        n = len(products)
+        indie_pct = (len(genuine) / n * 100) if n else 0
+        if len(genuine) >= 5 and indie_pct >= 10:
+            verdict = "Próspero"
+        elif len(genuine) >= 3 and indie_pct >= 5:
+            verdict = "Viable"
+        elif len(genuine) >= 1:
+            verdict = "Limitado"
+        else:
+            verdict = "Sin evidencia"
+
+        return {
+            "total_small": len(small_with_sales),
+            "genuine_indie": len(genuine),
+            "established_new_listing": len(established_new),
+            "indie_pct": round(indie_pct, 1),
+            "indie_examples": examples,
+            "indie_revenue_share_pct": indie_share,
+            "verdict": verdict,
+        }
+
     def _calc_entrant_viability_score(
         self, products: list[dict], price: float | None,
         estimated_margin: float | None,
         revenue_tiers: dict,
         price_opportunity: dict | None,
         launch_investment: dict | None = None,
+        newcomer_success: dict | None = None,
     ) -> tuple[float, list[dict]]:
         """Entrant Viability = can a NEW small seller make money here?
         HIGH score = realistic path to profit for a newcomer.
@@ -1149,29 +1305,28 @@ class NicheAnalyzer:
             score += signal_val
             breakdown.append({"signal": "Ganancia Estimada Entrante", "value": "Sin datos suficientes", "score": 30, "weight": w_profit, "weighted": signal_val})
 
-        # --- Signal 2: Small seller survivors ---
+        # --- Signal 2: Genuine indie seller survivors ---
+        # Use newcomer_success to distinguish real indie sellers from big-brand new listings
         n = len(products)
-        small_with_sales = sum(
-            1 for p in products
-            if (p.get("reviews_count") or 0) < 500 and p.get("monthly_bought")
-        )
-        small_pct = (small_with_sales / n * 100) if n else 0
+        nc = newcomer_success or self._calc_newcomer_success(products)
+        genuine_indie = nc["genuine_indie"]
+        indie_pct = nc["indie_pct"]
 
-        if small_pct >= 30:
+        if indie_pct >= 15:
             surv_score = 90
-        elif small_pct >= 20:
+        elif indie_pct >= 10:
             surv_score = 75
-        elif small_pct >= 15:
+        elif indie_pct >= 7:
             surv_score = 60
-        elif small_pct >= 10:
+        elif indie_pct >= 4:
             surv_score = 45
-        elif small_pct >= 5:
+        elif indie_pct >= 2:
             surv_score = 30
         else:
             surv_score = 15
         signal_val = round(surv_score * w_survivors / 100, 1)
         score += signal_val
-        breakdown.append({"signal": "Vendedores Pequeños Activos", "value": f"{small_with_sales} de {n} ({small_pct:.0f}% <500 rev vendiendo)", "score": surv_score, "weight": w_survivors, "weighted": signal_val})
+        breakdown.append({"signal": "Vendedores Indie Genuinos", "value": f"{genuine_indie} indie de {n} ({indie_pct:.0f}% genuinos vendiendo)", "score": surv_score, "weight": w_survivors, "weighted": signal_val})
 
         # --- Signal 3: Best entry ease across price ranges ---
         ranges = (price_opportunity or {}).get("ranges", [])
@@ -1644,6 +1799,7 @@ class NicheAnalyzer:
             keepa_data_confidence=a.get("keepa_data_confidence"),
             keepa_products_analyzed=a.get("keepa_products_analyzed"),
             launch_investment=a.get("launch_investment"),
+            newcomer_success=a.get("newcomer_success"),
             created_at=a.get("created_at"),
         )
 

@@ -144,6 +144,21 @@ PRESUPUESTO DISPONIBLE: ${b:,}
             ctx += f"- CPC estimado: ${launch_inv.get('estimated_cpc', 'N/A')}\n"
             ctx += f"- Conversión estimada (vendedor nuevo): {(launch_inv.get('conversion_rate_new', 0) * 100):.0f}%\n"
 
+        # Newcomer success — genuine indie sellers thriving?
+        newcomer = analysis_data.get('newcomer_success')
+        if newcomer and isinstance(newcomer, dict):
+            ctx += f"\nÉXITO DE VENDEDORES NUEVOS GENUINOS (filtrado — excluye listings nuevos de marcas grandes):\n"
+            ctx += f"- Vendedores pequeños totales (<500 rev con ventas): {newcomer.get('total_small', 0)}\n"
+            ctx += f"- Genuinos indie (marca con 1 solo producto en resultados): {newcomer.get('genuine_indie', 0)} ({newcomer.get('indie_pct', 0):.1f}% del nicho)\n"
+            ctx += f"- Listings nuevos de marcas grandes: {newcomer.get('established_new_listing', 0)}\n"
+            ctx += f"- Revenue share de indies: {newcomer.get('indie_revenue_share_pct', 0):.1f}%\n"
+            ctx += f"- Veredicto newcomers: {newcomer.get('verdict', 'Sin datos')}\n"
+            examples = newcomer.get('indie_examples', [])
+            if examples:
+                ctx += "- Ejemplos de indie sellers:\n"
+                for ex in examples[:5]:
+                    ctx += f"  · {ex.get('brand', '?')}: {ex.get('reviews', 0)} rev, ${ex.get('price', 0):.2f}, {ex.get('rating', 0)}★, {ex.get('monthly_bought', '?')} (~${ex.get('est_monthly_revenue', 0):,}/mes)\n"
+
         # Data quality warnings (condensed)
         warnings = []
         prime_pct = analysis_data.get('prime_percentage')

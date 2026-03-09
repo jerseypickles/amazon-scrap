@@ -85,6 +85,8 @@ class NicheAnalysisResponse(BaseModel):
     keepa_products_analyzed: int | None = None
     # Launch investment (calculated)
     launch_investment: dict | None = None
+    # Newcomer success analysis
+    newcomer_success: dict | None = None
     parent_keyword: str | None = None
     created_at: datetime | None = None
     is_cached: bool = False
