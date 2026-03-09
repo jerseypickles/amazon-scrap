@@ -10,9 +10,11 @@ import {
   Repeat,
   Brain,
   Sparkles,
+  TrendingUp,
+  Compass,
 } from "lucide-react";
 import { analyzeNiche, getSmartNiches } from "@/lib/api";
-import type { NicheAnalysis, SmartNiche } from "@/types";
+import type { NicheAnalysis, SmartNiche, SmartNichesResponse } from "@/types";
 
 function scoreColor(s: number | null) {
   if (s === null) return "var(--text-muted)";
@@ -30,6 +32,48 @@ function scoreBadge(s: number | null) {
   return { cls: "badge-danger", text: "Difícil" };
 }
 
+function labelStyle(label: string) {
+  const map: Record<string, { bg: string; color: string; border: string }> = {
+    Oportunidad: { bg: "rgba(16,185,129,0.15)", color: "#10b981", border: "rgba(16,185,129,0.3)" },
+    Bueno: { bg: "rgba(132,204,22,0.15)", color: "#84cc16", border: "rgba(132,204,22,0.3)" },
+    Competido: { bg: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "rgba(245,158,11,0.25)" },
+    "Difícil": { bg: "rgba(239,68,68,0.12)", color: "#ef4444", border: "rgba(239,68,68,0.25)" },
+  };
+  return map[label] || { bg: "rgba(148,163,184,0.1)", color: "var(--text-muted)", border: "rgba(255,255,255,0.08)" };
+}
+
+function NichePill({ n, onClick }: { n: SmartNiche; onClick: () => void }) {
+  const ls = labelStyle(n.label);
+  return (
+    <button
+      onClick={onClick}
+      className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 hover:scale-[1.03]"
+      style={{
+        background: n.analyzed ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.02)",
+        border: `1px solid ${n.analyzed ? ls.border : "rgba(255,255,255,0.08)"}`,
+        color: n.analyzed ? "var(--text-primary)" : "var(--text-secondary)",
+      }}
+    >
+      {n.keyword}
+      {n.analyzed && n.opportunity_score !== null && (
+        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-0.5" style={{ background: ls.bg, color: ls.color }}>
+          {Math.round(n.opportunity_score)}
+        </span>
+      )}
+      {n.analyzed && (
+        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full" style={{ background: ls.bg, color: ls.color }}>
+          {n.label}
+        </span>
+      )}
+      {!n.analyzed && (
+        <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full" style={{ background: "rgba(148,163,184,0.1)", color: "var(--text-muted)" }}>
+          Nuevo
+        </span>
+      )}
+    </button>
+  );
+}
+
 export default function SearchPage() {
   return (
     <Suspense fallback={<div className="flex items-center justify-center h-96"><div className="spinner" /></div>}>
@@ -44,14 +88,14 @@ function SearchPageInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<NicheAnalysis | null>(null);
-  const [niches, setNiches] = useState<SmartNiche[]>([]);
+  const [smartData, setSmartData] = useState<SmartNichesResponse | null>(null);
   const [nichesLoading, setNichesLoading] = useState(true);
   const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
     getSmartNiches()
-      .then((d) => setNiches(d.niches))
+      .then((d) => setSmartData(d))
       .catch(() => {})
       .finally(() => setNichesLoading(false));
     const q = searchParams.get("q");
@@ -127,105 +171,105 @@ function SearchPageInner() {
         </form>
       </div>
 
-      {/* Smart Niche Suggestions */}
+      {/* Smart Niche Suggestions — 3 dynamic sections */}
       {!result && !loading && (
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div
-                className="w-7 h-7 rounded-lg flex items-center justify-center"
-                style={{ background: "rgba(168,85,247,0.15)", boxShadow: "0 0 12px rgba(168,85,247,0.1)" }}
-              >
-                <Brain size={14} color="#a855f7" />
-              </div>
-              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
-                Nichos Inteligentes
-              </p>
-              <Sparkles size={12} color="#a855f7" style={{ opacity: 0.6 }} />
-            </div>
-            {niches.length > 0 && (
-              <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-                {niches.filter((n) => n.analyzed).length} analizados de {niches.length}
-              </p>
-            )}
-          </div>
-
+        <div className="mb-8 space-y-6">
           {nichesLoading ? (
             <div className="flex items-center gap-2 py-4">
               <Loader2 size={14} className="animate-spin" style={{ color: "var(--text-muted)" }} />
               <span className="text-xs" style={{ color: "var(--text-muted)" }}>Cargando nichos...</span>
             </div>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {niches.map((n) => (
-                <button
-                  key={n.keyword}
-                  onClick={() => setKeyword(n.keyword)}
-                  className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 hover:scale-[1.03]"
-                  style={{
-                    background: n.analyzed
-                      ? "rgba(255,255,255,0.04)"
-                      : "rgba(255,255,255,0.02)",
-                    border: `1px solid ${
-                      n.label === "Oportunidad" ? "rgba(16,185,129,0.3)" :
-                      n.label === "Bueno" ? "rgba(132,204,22,0.3)" :
-                      n.label === "Competido" ? "rgba(245,158,11,0.25)" :
-                      n.label === "Difícil" ? "rgba(239,68,68,0.25)" :
-                      "rgba(255,255,255,0.08)"
-                    }`,
-                    color: n.analyzed ? "var(--text-primary)" : "var(--text-secondary)",
-                  }}
-                >
-                  {n.keyword}
-                  {n.analyzed && n.opportunity_score !== null && (
-                    <span
-                      className="text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-0.5"
-                      style={{
-                        background:
-                          n.label === "Oportunidad" ? "rgba(16,185,129,0.15)" :
-                          n.label === "Bueno" ? "rgba(132,204,22,0.15)" :
-                          n.label === "Competido" ? "rgba(245,158,11,0.12)" :
-                          "rgba(239,68,68,0.12)",
-                        color:
-                          n.label === "Oportunidad" ? "#10b981" :
-                          n.label === "Bueno" ? "#84cc16" :
-                          n.label === "Competido" ? "#f59e0b" :
-                          "#ef4444",
-                      }}
-                    >
-                      {Math.round(n.opportunity_score)}
+          ) : smartData && (
+            <>
+              {/* Section: Analyzed */}
+              {smartData.analyzed.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(168,85,247,0.15)" }}>
+                        <Brain size={14} color="#a855f7" />
+                      </div>
+                      <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                        Tus An&aacute;lisis
+                      </p>
+                    </div>
+                    <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                      {smartData.analyzed_count} analizados de {smartData.total_available} disponibles
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {smartData.analyzed.map((n) => (
+                      <NichePill key={n.keyword} n={n} onClick={() => setKeyword(n.keyword)} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Section: Suggested */}
+              {smartData.suggested.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(16,185,129,0.15)" }}>
+                      <TrendingUp size={14} color="#10b981" />
+                    </div>
+                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                      Sugeridos para ti
+                    </p>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(16,185,129,0.1)", color: "#10b981" }}>
+                      Basado en tus categor&iacute;as
                     </span>
-                  )}
-                  {n.analyzed && (
-                    <span
-                      className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full"
-                      style={{
-                        background:
-                          n.label === "Oportunidad" ? "rgba(16,185,129,0.15)" :
-                          n.label === "Bueno" ? "rgba(132,204,22,0.15)" :
-                          n.label === "Competido" ? "rgba(245,158,11,0.12)" :
-                          "rgba(239,68,68,0.12)",
-                        color:
-                          n.label === "Oportunidad" ? "#10b981" :
-                          n.label === "Bueno" ? "#84cc16" :
-                          n.label === "Competido" ? "#f59e0b" :
-                          "#ef4444",
-                      }}
-                    >
-                      {n.label}
-                    </span>
-                  )}
-                  {!n.analyzed && (
-                    <span
-                      className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full"
-                      style={{ background: "rgba(148,163,184,0.1)", color: "var(--text-muted)" }}
-                    >
-                      Nuevo
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {smartData.suggested.map((n) => (
+                      <NichePill key={n.keyword} n={n} onClick={() => setKeyword(n.keyword)} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Section: Discover */}
+              {smartData.discover.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(249,115,22,0.15)" }}>
+                      <Compass size={14} color="var(--accent)" />
+                    </div>
+                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                      Descubre
+                    </p>
+                    <Sparkles size={12} color="var(--accent)" style={{ opacity: 0.6 }} />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {smartData.discover.map((n) => (
+                      <NichePill key={n.keyword} n={n} onClick={() => setKeyword(n.keyword)} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty state — no analyses yet */}
+              {smartData.analyzed.length === 0 && smartData.suggested.length === 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(168,85,247,0.15)" }}>
+                      <Brain size={14} color="#a855f7" />
+                    </div>
+                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                      Nichos Inteligentes
+                    </p>
+                    <Sparkles size={12} color="#a855f7" style={{ opacity: 0.6 }} />
+                  </div>
+                  <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
+                    Analiza tu primer nicho y el sistema te sugerir&aacute; keywords relacionados
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {smartData.discover.map((n) => (
+                      <NichePill key={n.keyword} n={n} onClick={() => setKeyword(n.keyword)} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

@@ -396,12 +396,18 @@ export interface SmartNiche {
   total_products: number | null;
   brand_count: number | null;
   label: string; // "Oportunidad" | "Bueno" | "Competido" | "Difícil" | "Nuevo"
+  section: string; // "analyzed" | "suggested" | "discover"
+  category_id: string | null;
+  category_name: string | null;
   created_at: string | null;
 }
 
 export interface SmartNichesResponse {
-  niches: SmartNiche[];
-  total: number;
+  analyzed: SmartNiche[];
+  suggested: SmartNiche[];
+  discover: SmartNiche[];
+  interested_categories: string[];
+  total_available: number;
   analyzed_count: number;
 }
 
