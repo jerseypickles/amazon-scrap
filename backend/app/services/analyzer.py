@@ -1197,9 +1197,13 @@ class NicheAnalyzer:
             return int(num)
 
         # Separate small sellers (<500 reviews with sales)
+        # Require reviews_count to be an actual number — products with None are
+        # incomplete scraper data and cannot be classified as small or large.
         small_with_sales = [
             p for p in products
-            if (p.get("reviews_count") or 0) < 500 and p.get("monthly_bought")
+            if p.get("reviews_count") is not None
+            and p["reviews_count"] < 500
+            and p.get("monthly_bought")
         ]
 
         genuine = []
@@ -1222,8 +1226,11 @@ class NicheAnalyzer:
         )
         indie_share = round(indie_revenue / total_revenue_all * 100, 1) if total_revenue_all > 0 else 0
 
-        # Build examples (sorted by reviews ascending — newest first)
-        genuine_sorted = sorted(genuine, key=lambda p: p.get("reviews_count") or 0)
+        # Build examples — prefer products with price data, then sort by reviews ascending
+        genuine_sorted = sorted(
+            genuine,
+            key=lambda p: (0 if p.get("price") else 1, p.get("reviews_count") or 0),
+        )
         examples = []
         for p in genuine_sorted[:5]:
             bought_num = _parse_bought(p.get("monthly_bought"))
